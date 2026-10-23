@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <title>Fullshot Pro Editor</title>
+  <style>
+    /* CSS Variables for 100% reliable Day/Night Theme switching */
+    :root, [data-theme="dark"] {
+      --bg-app: #0f172a;
+      --bg-header: #1e293b;
+      --bg-sidebar: #1e293b;
+      --bg-viewport: #090d16;
+      --border-color: #334155;
+      --border-subtle: #1e293b;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --tool-bg: #243046;
+      --tool-hover: #334155;
+      --tool-active: #4f46e5;
+      --tool-active-text: #ffffff;
+      --card-bg: #1e293b;
+      --grid-line: rgba(148, 163, 184, 0.08);
+      --scrollbar-track: #090d16;
+      --scrollbar-thumb: #334155;
+      --scrollbar-thumb-hover: #475569;
+    }
+
+    [data-theme="light"] {
+      --bg-app: #f1f5f9;
+      --bg-header: #ffffff;
+      --bg-sidebar: #ffffff;
+      --bg-viewport: #e2e8f0;
+      --border-color: #cbd5e1;
+      --border-subtle: #f1f5f9;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --tool-bg: #f8fafc;
+      --tool-hover: #e2e8f0;
+      --tool-active: #4f46e5;
+      --tool-active-text: #ffffff;
+      --card-bg: #ffffff;
+      --grid-line: rgba(100, 116, 139, 0.12);
+      --scrollbar-track: #e2e8f0;
+      --scrollbar-thumb: #94a3b8;
+      --scrollbar-thumb-hover: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100vh;
+      max-height: 100vh;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-app);
+      color: var(--text-primary);
+      user-select: none;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* HEADER */
+    header {
+      height: 54px;
+      min-height: 54px;
+      max-height: 54px;
+      background-color: var(--bg-header);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 20;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      box-shadow: 0 3px 10px rgba(79, 70, 229, 0.35);
+    }
+
+    .brand-title {
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pro-badge {
+      background: rgba(99, 102, 241, 0.15);
+      color: #6366f1;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .res-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* HEADER CONTROLS */
+    .header-center {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .control-pill {
+      display: flex;
+      align-items: center;
+      background-color: var(--bg-app);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .pill-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .pill-btn:hover {
+      background-color: var(--tool-hover);
+      color: var(--text-primary);
+    }
+
+    .zoom-text {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      padding: 0 8px;
+      min-width: 48px;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .zoom-text:hover {
+      color: #6366f1;
+    }
+
+    .theme-toggle-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background-color: var(--bg-app);
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .theme-toggle-btn:hover {
+      background-color: var(--tool-hover);
+      color: var(--text-primary);
+    }
+
+    /* EXPORT / COPY ACTIONS */
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .action-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    }
+
+    .btn-copy {
+      background-color: #059669;
+      color: #ffffff;
+    }
+
+    .btn-copy:hover {
+      background-color: #047857;
+    }
+
+    .btn-export-png {
+      background-color: #4f46e5;
+      color: #ffffff;
+    }
+
+    .btn-export-png:hover {
+      background-color: #4338ca;
+    }
+
+    .btn-export-pdf {
+      background-color: #7c3aed;
+      color: #ffffff;
+    }
+
+    .btn-export-pdf:hover {
+      background-color: #6d28d9;
+    }
+
+    /* MAIN WORKSPACE */
+    #mainWorkspace {
+      flex: 1 1 0%;
+      min-height: 0;
+      height: calc(100vh - 54px);
+      max-height: calc(100vh - 54px);
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* SIDEBAR */
+    #sidebar {
+      width: 140px;
+      min-width: 140px;
+      max-width: 140px;
+      height: 100%;
+      background-color: var(--bg-sidebar);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      padding: 8px;
+      gap: 8px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      flex-shrink: 0;
+      z-index: 10;
+      position: relative;
+    }
+
+    .sidebar-section-title {
+      font-size: 9px;
+      font-weight: 800;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      text-align: center;
+      margin-bottom: 2px;
+    }
+
+    .tools-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .tool-btn {
+      width: 100%;
+      height: 48px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      background-color: var(--tool-bg);
+      color: var(--tool-btn-color);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-size: 10px;
+      font-weight: 600;
+      position: relative;
+    }
+
+    .tool-btn svg {
+      width: 18px;
+      height: 18px;
+      stroke-width: 2.2;
+    }
+
+    .tool-btn:hover:not(.active) {
+      background-color: var(--tool-hover);
+      color: var(--text-primary);
+    }
+
+    .tool-btn.active {
+      background-color: var(--tool-active) !important;
+      color: var(--tool-active-text) !important;
+      border-color: #6366f1;
+      box-shadow: 0 3px 10px rgba(79, 70, 229, 0.4);
+    }
+
+    .tool-btn.full-width {
+      grid-column: span 2;
+      height: 38px;
+      flex-direction: row;
+      gap: 6px;
+    }
+
+    .divider {
+      height: 1px;
+      background-color: var(--border-color);
+      width: 100%;
+      margin: 2px 0;
+    }
+
+    /* UNDO / REDO (COMPACT ICON ONLY) */
+    .history-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .history-btn {
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background-color: var(--tool-bg);
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .history-btn:hover:not(:disabled) {
+      background-color: var(--tool-hover);
+      color: var(--text-primary);
+    }
+
+    .history-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* STROKE WEIGHT SLIDER */
+    .slider-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      width: 100%;
+      position: relative;
+    }
+
+    .slider-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .slider-val {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--text-secondary);
+      background-color: var(--tool-bg);
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+    }
+
+    .weight-slider {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--tool-bg);
+      outline: none;
+      border: 1px solid var(--border-color);
+      -webkit-appearance: none;
+      cursor: pointer;
+    }
+
+    .weight-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #4f46e5;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      border: 2px solid #ffffff;
+      transition: transform 0.1s;
+    }
+
+    .weight-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    /* STROKE PREVIEW BUBBLE POPUP */
+    .stroke-preview-bubble {
+      position: absolute;
+      left: 148px;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+      border-radius: 12px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      z-index: 1000;
+      pointer-events: none;
+      transition: opacity 0.15s ease-out;
+      min-width: 80px;
+    }
+
+    .preview-circle-wrap {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--tool-bg);
+      border-radius: 50%;
+      border: 1px dashed var(--border-color);
+    }
+
+    .preview-circle {
+      border-radius: 50%;
+      background-color: #ef4444;
+      transition: width 0.05s, height 0.05s;
+    }
+
+    .preview-text {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+
+    /* COLOR SWATCHES */
+    .color-swatches {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      width: 100%;
+    }
+
+    .color-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.15s, border-color 0.15s;
+      margin: 0 auto;
+    }
+
+    .color-dot:hover {
+      transform: scale(1.15);
+    }
+
+    .color-dot.active {
+      border-color: #ffffff;
+      box-shadow: 0 0 0 2px #4f46e5;
+      transform: scale(1.1);
+    }
+
+    .color-picker-wrap {
+      grid-column: span 4;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background-color: var(--tool-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 4px 8px;
+      cursor: pointer;
+      margin-top: 2px;
+    }
+
+    .color-picker-wrap input[type="color"] {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      border: none;
+      background: none;
+      cursor: pointer;
+    }
+
+    .color-picker-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+
+    /* CLEAR BUTTON */
+    .clear-btn {
+      width: 100%;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      background-color: rgba(244, 63, 94, 0.1);
+      color: #fb7185;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+      margin-top: auto;
+      transition: all 0.15s;
+    }
+
+    .clear-btn:hover {
+      background-color: #f43f5e;
+      color: #ffffff;
+    }
+
+    /* VIEWPORT (CANVAS SCROLLER) */
+    #viewport {
+      flex: 1 1 0%;
+      min-height: 0;
+      height: 100%;
+      max-height: 100%;
+      overflow: auto;
+      position: relative;
+      background-color: var(--bg-viewport);
+      background-size: 24px 24px;
+      background-image: linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+                        linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+      padding: 32px 16px;
+      display: block;
+      text-align: center;
+    }
+
+    /* PROMINENT VISIBLE SCROLLBARS */
+    #viewport::-webkit-scrollbar {
+      width: 14px;
+      height: 14px;
+    }
+
+    #viewport::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+    }
+
+    #viewport::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 7px;
+      border: 3px solid var(--scrollbar-track);
+    }
+
+    #viewport::-webkit-scrollbar-thumb:hover {
+      background: var(--scrollbar-thumb-hover);
+    }
+
+    #sidebar::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    #sidebar::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 3px;
+    }
+
+    /* CANVAS WRAPPER */
+    #canvasWrapper {
+      display: inline-block;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border-color);
+      position: relative;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    #editorCanvas {
+      display: block;
+      border-radius: 8px;
+    }
+
+    /* INLINE TEXT OVERLAY WRAPPER */
+    .inline-text-wrapper {
+      position: absolute;
+      z-index: 60;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: rgba(15, 23, 42, 0.96);
+      border: 1.5px solid #6366f1;
+      border-radius: 8px;
+      padding: 8px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      min-width: 180px;
+      max-width: 480px;
+    }
+
+    .inline-text-box {
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-weight: bold;
+      resize: none;
+      overflow: hidden;
+      line-height: 1.3;
+      padding: 2px;
+    }
+
+    .inline-text-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      padding-top: 6px;
+    }
+
+    .inline-text-btn {
+      padding: 4px 10px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+    }
+
+    .inline-text-btn.btn-done {
+      background: #4f46e5;
+      color: white;
+    }
+
+    .inline-text-btn.btn-done:hover {
+      background: #4338ca;
+    }
+
+    .inline-text-btn.btn-cancel {
+      background: #334155;
+      color: #94a3b8;
+    }
+
+    .inline-text-btn.btn-cancel:hover {
+      background: #475569;
+      color: white;
+    }
+
+    /* CROP ACTION BAR */
+    .crop-action-bar {
+      position: absolute;
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 6px 12px;
+      border-radius: 20px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+
+    .crop-dim-badge {
+      font-size: 11px;
+      font-weight: 700;
+      color: #94a3b8;
+      padding-right: 4px;
+    }
+
+    .crop-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .apply-btn {
+      background: #10b981;
+      color: white;
+    }
+
+    .apply-btn:hover {
+      background: #059669;
+    }
+
+    .cancel-btn {
+      background: #475569;
+      color: #f1f5f9;
+    }
+
+    .cancel-btn:hover {
+      background: #64748b;
+    }
+
+    /* TOOL CUSTOMIZATION MODAL (DOUBLE-CLICK POPOVER) */
+    .tool-settings-modal {
+      position: absolute;
+      left: 148px;
+      top: 50px;
+      width: 250px;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: popIn 0.15s ease-out;
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .tool-settings-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--tool-bg);
+    }
+
+    .tool-settings-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--text-primary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .close-modal-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+      padding: 2px 4px;
+    }
+
+    .close-modal-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .tool-settings-body {
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .setting-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .setting-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+
+    .setting-btn-group {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+    }
+
+    .setting-opt-btn {
+      padding: 6px 4px;
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: var(--tool-bg);
+      color: var(--text-secondary);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.12s;
+    }
+
+    .setting-opt-btn:hover {
+      background: var(--tool-hover);
+      color: var(--text-primary);
+    }
+
+    .setting-opt-btn.active {
+      background: var(--tool-active);
+      color: white;
+      border-color: #6366f1;
+    }
+
+    /* UTILITY */
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <!-- TOP HEADER -->
+  <header>
+    <div class="brand-wrap">
+      <div class="brand-icon">
+        <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">
+          FULLSHOT EDITOR <span class="pro-badge">PRO</span>
+        </div>
+        <div class="res-label" id="resLabel">Loading screenshot...</div>
+      </div>
+    </div>
+
+    <!-- CENTER ZOOM & THEME -->
+    <div class="header-center">
+      <div class="control-pill">
+        <button id="zoomOutBtn" class="pill-btn" title="Zoom Out (-)">
+          <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M20 12H4" /></svg>
+        </button>
+        <span id="zoomLabel" class="zoom-text" title="Click to reset to 100%">100%</span>
+        <button id="zoomInBtn" class="pill-btn" title="Zoom In (+)">
+          <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 4v16m8-8H4" /></svg>
+        </button>
+        <button id="zoomFitBtn" class="pill-btn" style="border-left: 1px solid var(--border-color); border-radius: 0 6px 6px 0;" title="Fit to Screen Width">
+          <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" /></svg>
+        </button>
+      </div>
+
+      <!-- THEME TOGGLE (DAY / NIGHT) -->
+      <button id="themeToggleBtn" class="theme-toggle-btn" title="Toggle Day / Night Mode">
+        <svg id="themeSunIcon" style="width: 18px; height: 18px; color: #f59e0b;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707m12.728 12.728A9 9 0 115.636 5.636m12.728 12.728L12 12" />
+        </svg>
+        <svg id="themeMoonIcon" class="hidden" style="width: 18px; height: 18px; color: #6366f1;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- EXPORT & COPY ACTIONS -->
+    <div class="header-actions">
+      <!-- COPY BUTTON -->
+      <button id="copyBtn" class="action-btn btn-copy" title="Copy screenshot to clipboard (Ctrl+C)">
+        <svg style="width: 15px; height: 15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+        </svg>
+        <span>Copy Image</span>
+      </button>
+
+      <!-- EXPORT PNG -->
+      <button id="exportBtn" class="action-btn btn-export-png" title="Download PNG file">
+        <svg style="width: 15px; height: 15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        <span>Export PNG</span>
+      </button>
+
+      <!-- EXPORT PDF -->
+      <button id="exportPdfBtn" class="action-btn btn-export-pdf" title="Download PDF document">
+        <svg style="width: 15px; height: 15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        <span>Export PDF</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <div id="mainWorkspace">
+    <!-- LEFT SIDEBAR -->
+    <div id="sidebar">
+      <!-- TOOL BUTTONS (Clean 2-column grid, no redundant "Tools" header) -->
+      <div class="tools-grid" id="toolsContainer">
+        <button id="tool-select" class="tool-btn active" title="Select & Move / Resize (Double-click to customize)">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+          <span>Select</span>
+        </button>
+
+        <!-- REPLACED PAN WITH CROP TOOL -->
+        <button id="tool-crop" class="tool-btn" title="Crop Canvas (Double-click to customize)">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 2v14a2 2 0 002 2h14M18 22V8a2 2 0 00-2-2H2" /></svg>
+          <span>Crop</span>
+        </button>
+
+        <button id="tool-pencil" class="tool-btn" title="Freehand Smooth Pen (Double-click to customize)">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+          <span>Draw</span>
+        </button>
+
+        <button id="tool-highlighter" class="tool-btn" title="Highlight (Double-click to customize opacity)">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+          <span>Highlight</span>
+        </button>
+
+        <button id="tool-rectangle" class="tool-btn" title="Draw Rectangle (Double-click to customize)">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5z" /></svg>
+          <span>Square</span>
+        </button>
+
+        <button id="tool-circle" class="tool-btn" title="Draw Circle (Double-click to customize)">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <span>Circle</span>
+        </button>
+
+        <button id="tool-arrow" class="tool-btn" title="Draw Arrow (Double-click to customize)">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+          <span>Arrow</span>
+        </button>
+
+        <button id="tool-text" class="tool-btn" title="Type Text directly on image (Double-click to customize)">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>
+          <span>Text</span>
+        </button>
+
+        <button id="tool-blur" class="tool-btn full-width" title="Censor / Blur Box (Double-click to customize blur style/intensity)">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" /></svg>
+          <span>Censor / Blur</span>
+        </button>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- UNDO / REDO (COMPACT ICON ONLY) -->
+      <div class="history-grid">
+        <button id="undoBtn" class="history-btn" title="Undo (Ctrl+Z)" disabled>
+          <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+        </button>
+        <button id="redoBtn" class="history-btn" title="Redo (Ctrl+Y)" disabled>
+          <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" /></svg>
+        </button>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- STROKE WEIGHT SLIDER -->
+      <div class="slider-wrap" id="sliderWrap">
+        <div class="slider-header">
+          <span class="sidebar-section-title" id="sliderSectionTitle" style="margin: 0;">Stroke Size</span>
+          <span id="strokeWeightVal" class="slider-val">6px</span>
+        </div>
+        <input type="range" id="strokeWeightSlider" min="2" max="40" value="6" class="weight-slider" title="Stroke / Text Size">
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- COLOR PALETTE -->
+      <div class="sidebar-section-title">Color</div>
+      <div class="color-swatches" id="colorSwatches">
+        <div class="color-dot active" data-color="#ef4444" style="background-color: #ef4444;" title="Red"></div>
+        <div class="color-dot" data-color="#f97316" style="background-color: #f97316;" title="Orange"></div>
+        <div class="color-dot" data-color="#eab308" style="background-color: #eab308;" title="Yellow"></div>
+        <div class="color-dot" data-color="#10b981" style="background-color: #10b981;" title="Green"></div>
+        <div class="color-dot" data-color="#3b82f6" style="background-color: #3b82f6;" title="Blue"></div>
+        <div class="color-dot" data-color="#8b5cf6" style="background-color: #8b5cf6;" title="Purple"></div>
+        <div class="color-dot" data-color="#ffffff" style="background-color: #ffffff; border-color: #cbd5e1;" title="White"></div>
+        <div class="color-dot" data-color="#0f172a" style="background-color: #0f172a;" title="Black"></div>
+        
+        <label class="color-picker-wrap" title="Pick custom color">
+          <input type="color" id="brushColor" value="#ef4444">
+          <span class="color-picker-label">Custom</span>
+        </label>
+      </div>
+
+      <!-- CLEAR CANVAS -->
+      <button id="clearBtn" class="clear-btn" title="Clear all annotations">
+        <svg style="width: 15px; height: 15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+        <span>Clear</span>
+      </button>
+    </div>
+
+    <!-- LIVE POPUP PREVIEW BUBBLE (Floats outside sidebar with full visibility) -->
+    <div id="strokePreviewBubble" class="stroke-preview-bubble hidden">
+      <div class="preview-circle-wrap">
+        <div id="previewCircle" class="preview-circle"></div>
+      </div>
+      <div id="previewText" class="preview-text">6px</div>
+    </div>
+
+    <!-- DYNAMIC TOOL CUSTOMIZATION POPOVER (Double-click or Right-click any tool) -->
+    <div id="toolSettingsModal" class="tool-settings-modal hidden">
+      <div class="tool-settings-header">
+        <div id="toolSettingsTitle" class="tool-settings-title">Tool Settings</div>
+        <button id="closeToolSettingsBtn" class="close-modal-btn">✕</button>
+      </div>
+      <div id="toolSettingsBody" class="tool-settings-body">
+        <!-- Injected via JavaScript -->
+      </div>
+    </div>
+
+    <!-- MAIN VIEWPORT (Strictly bounded container with native scroll) -->
+    <div id="viewport">
+      <div id="canvasWrapper">
+        <canvas id="editorCanvas"></canvas>
+
+        <!-- INLINE TEXT OVERLAY WRAPPER -->
+        <div id="inlineTextWrapper" class="inline-text-wrapper hidden">
+          <textarea id="activeInlineText" class="inline-text-box" placeholder="Type text here..." rows="1"></textarea>
+          <div class="inline-text-actions">
+            <button id="inlineTextDoneBtn" class="inline-text-btn btn-done" title="Commit text (Enter)">Done</button>
+            <button id="inlineTextCancelBtn" class="inline-text-btn btn-cancel" title="Cancel (Esc)">✕</button>
+          </div>
+        </div>
+
+        <!-- CROP ACTION BAR -->
+        <div id="cropActionBar" class="crop-action-bar hidden">
+          <span id="cropDimBadge" class="crop-dim-badge">0 × 0</span>
+          <button id="applyCropBtn" class="crop-btn apply-btn" title="Apply Crop (Enter)">
+            <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+            <span>Crop</span>
+          </button>
+          <button id="cancelCropBtn" class="crop-btn cancel-btn" title="Cancel Crop (Esc)">
+            <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+            <span>Cancel</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="jspdf.umd.min.js"></script>
+  <script src="editor.js"></script>
+</body>
+</html>
