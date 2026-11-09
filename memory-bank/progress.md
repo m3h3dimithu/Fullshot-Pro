@@ -41,6 +41,9 @@
 - [x] Text Bounding Box calculation & handle detection test (`test_editor.js` - Passed).
 - [x] Independent shape editing verification (`test_circles.js` - Passed).
 - [x] Full crop undo/redo bitmap snapshot restoration verified.
+- [x] Target section highlight & element picker unit & integration test (`test_header_and_picker.js` - Passed).
+- [x] Header once (`headerMode: 'once'`) slice 0 vs slice 1+ inset logic test (`test_header_and_picker.js` - Passed).
+- [x] User manual testing & acceptance: Confirmed working smoothly ("working good").
 
 ---
 
