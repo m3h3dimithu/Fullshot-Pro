@@ -1,0 +1,13 @@
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+*.crx
+*.pem
+*.zip
+.vscode/
+.idea/
+node_modules/
+__pycache__/
+*.pyc
+.impeccable/

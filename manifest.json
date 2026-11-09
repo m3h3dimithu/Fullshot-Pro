@@ -1,15 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Fullshot Pro - Full Page Screen Capture & Editor",
-  "version": "1.1.6",
-  "description": "Capture a full-page screenshot of any webpage instantly with a single click, scroll-stitch automatically, and annotate directly.",
+  "version": "1.2.1",
+  "description": "Capture a full-page screenshot of any webpage, tune scroll-shot pace and page setup from the icon right-click menu, and annotate locally.",
   "permissions": [
     "activeTab",
     "scripting",
     "storage",
     "unlimitedStorage",
     "notifications",
-    "clipboardWrite"
+    "clipboardWrite",
+    "contextMenus"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -18,14 +19,17 @@
     "service_worker": "background.js"
   },
   "action": {
+    "default_title": "Capture full page. Right-click for settings.",
     "default_icon": {
       "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
       "48": "icons/icon-48.png",
       "128": "icons/icon-128.png"
     }
   },
   "icons": {
     "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
   }

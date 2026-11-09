@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <title>Fullshot Pro</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="panel-header">
+    <div class="brand">
+      <img src="icons/icon-32.png" alt="" width="22" height="22">
+      <div>
+        <strong>Fullshot Pro</strong>
+        <span>Right-click the icon for this panel</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="actions">
+    <button id="captureFull" class="btn-primary" type="button">Capture full page</button>
+    <button id="captureVisible" class="btn-secondary" type="button">Visible area</button>
+  </div>
+
+  <p id="pageHint" class="page-hint">Checking this tab…</p>
+  <p id="statusMsg" class="status-msg" hidden></p>
+
+  <div class="panel-grid">
+  <section class="block">
+    <h2>Page setup</h2>
+    <p class="hint">Sites do not scroll the same way. Pick the layout that matches this page, then fine-tune below.</p>
+    <div class="chip-row" id="layoutPresets">
+      <button type="button" data-layout="auto">Auto</button>
+      <button type="button" data-layout="article">Article</button>
+      <button type="button" data-layout="spa">App / SPA</button>
+      <button type="button" data-layout="modal">Modal</button>
+      <button type="button" data-layout="sticky">Sticky bars</button>
+      <button type="button" data-layout="lazy">Lazy / slow</button>
+    </div>
+    <label class="field">
+      <span>Scroll target</span>
+      <select id="scrollTarget">
+        <option value="auto">Auto-detect</option>
+        <option value="window">Document / window</option>
+        <option value="container">Inner app container</option>
+        <option value="popup">Open modal / drawer / menu</option>
+        <option value="selector">CSS selector</option>
+      </select>
+    </label>
+    <label class="field" id="selectorField" hidden>
+      <span>Container selector</span>
+      <input id="selector" type="text" placeholder=".sidebar, #main, [data-scroll]" spellcheck="false">
+    </label>
+
+    <!-- Target Section Preview Card -->
+    <div class="target-card" id="targetCard">
+      <div class="target-header">
+        <div class="target-badge-wrap">
+          <span class="target-badge" id="targetBadge">WINDOW</span>
+          <strong class="target-title" id="targetTitle">Document / window</strong>
+        </div>
+        <div class="target-actions">
+          <button type="button" id="pickSectionBtn" class="btn-target" title="Click any section on the page to target it">🎯 Pick on page</button>
+          <button type="button" id="highlightTargetBtn" class="btn-target" title="Highlight target section on the webpage">👁️ Show</button>
+        </div>
+      </div>
+      <div class="target-details" id="targetDetails">
+        <span class="target-pill" id="targetDimensionsPill">1366 × 3200 px</span>
+        <span class="target-pill" id="targetScrollPill">Scrollable (3.2 pages)</span>
+      </div>
+      <p class="target-selector-text" id="targetSelectorText" hidden></p>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Capture pace</h2>
+    <p class="hint">Slower pace gives lazy images, virtual lists, and sticky headers time to settle before each slice.</p>
+    <div class="chip-row" id="pacePresets">
+      <button type="button" data-pace="fast">Fast</button>
+      <button type="button" data-pace="normal">Normal</button>
+      <button type="button" data-pace="slow">Slow</button>
+      <button type="button" data-pace="careful">Careful</button>
+    </div>
+    <div class="control-grid">
+    <label class="field">
+      <span>Wait after each scroll <em id="settleLabel">600 ms</em></span>
+      <input id="settleDelayMs" type="range" min="80" max="2500" step="20">
+    </label>
+    <label class="field">
+      <span>Wait before first slice <em id="startLabel">200 ms</em></span>
+      <input id="startDelayMs" type="range" min="0" max="2000" step="20">
+    </label>
+    <label class="field">
+      <span>Extra wait at the bottom <em id="bottomLabel">500 ms</em></span>
+      <input id="bottomWaitMs" type="range" min="0" max="2500" step="20">
+    </label>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Stitch</h2>
+    <div class="control-grid">
+    <label class="field">
+      <span>Slice overlap <em id="overlapLabel">28%</em></span>
+      <input id="overlapPercent" type="range" min="0" max="55" step="1">
+    </label>
+    <label class="field">
+      <span>Max slices <em id="slicesLabel">40</em></span>
+      <input id="maxSlices" type="range" min="2" max="80" step="1">
+    </label>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Overlays &amp; crop</h2>
+    <label class="field" style="margin-bottom: 10px;">
+      <span>Header &amp; sticky bars</span>
+      <select id="headerMode">
+        <option value="once">Capture header once (at top) [Recommended]</option>
+        <option value="hide">Hide all sticky bars &amp; headers</option>
+        <option value="repeat">Keep all sticky bars visible</option>
+      </select>
+    </label>
+    <div class="toggle-grid">
+    <label class="toggle">
+      <input id="disableAnimations" type="checkbox">
+      <span>Freeze animations during capture</span>
+    </label>
+    <label class="toggle">
+      <input id="waitForDynamicHeight" type="checkbox">
+      <span>Wait for infinite / lazy height</span>
+    </label>
+    <label class="toggle">
+      <input id="skipDuplicateFrames" type="checkbox">
+      <span>Skip duplicate frames</span>
+    </label>
+    <label class="toggle">
+      <input id="cropToScrollTarget" type="checkbox">
+      <span>Crop to the scrolling container</span>
+    </label>
+    </div>
+    <label class="field">
+      <span>Header / footer crop</span>
+      <select id="insetMode">
+        <option value="auto">Auto from sticky bars</option>
+        <option value="none">None</option>
+        <option value="manual">Manual pixels</option>
+      </select>
+    </label>
+    <div class="split" id="insetFields" hidden>
+      <label class="field">
+        <span>Top inset px</span>
+        <input id="topInsetPx" type="number" min="0" max="600" step="1">
+      </label>
+      <label class="field">
+        <span>Bottom inset px</span>
+        <input id="bottomInsetPx" type="number" min="0" max="600" step="1">
+      </label>
+    </div>
+  </section>
+
+  <details class="advanced">
+    <summary>Advanced</summary>
+    <label class="field">
+      <span>Scroll confirm retries <em id="retriesLabel">8</em></span>
+      <input id="scrollRetries" type="range" min="1" max="16" step="1">
+    </label>
+    <p class="hint">Raise retries on pages that fight programmatic scrolling. Lower them if capture hangs.</p>
+  </details>
+  </div>
+
+  <footer class="panel-footer">
+    <button id="resetSettings" class="btn-ghost" type="button">Reset defaults</button>
+    <span class="saved" id="savedNote">Saved on this device</span>
+  </footer>
+
+  <script src="capture-settings.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

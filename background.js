@@ -1,33 +1,127 @@
-// background.js - Listens to action clicks and captures the tab
-chrome.action.onClicked.addListener(async (tab) => {
-  if (!tab || !tab.id) return;
+// background.js - Toolbar click, right-click settings, scroll-stitch
+importScripts('capture-settings.js');
 
-  const tabUrl = tab.url || "";
+const MENU_SETTINGS = 'fullshot_open_settings';
+const MENU_VISIBLE = 'fullshot_capture_visible';
 
-  // Prevent capturing Chrome internal pages where scripting is forbidden
-  if (
-    tabUrl.startsWith('chrome://') || 
-    tabUrl.startsWith('chrome-extension://') || 
-    tabUrl.startsWith('edge://') || 
+function isRestrictedTabUrl(tabUrl) {
+  return (
+    tabUrl.startsWith('chrome://') ||
+    tabUrl.startsWith('chrome-extension://') ||
+    tabUrl.startsWith('edge://') ||
     tabUrl.startsWith('about:') ||
     tabUrl.startsWith('view-source:') ||
-    tabUrl.startsWith('https://chrome.google.com') || 
+    tabUrl.startsWith('https://chrome.google.com') ||
     tabUrl.startsWith('https://chromewebstore.google.com')
-  ) {
-    try {
-      chrome.notifications.create({
-        type: 'basic',
-        iconUrl: 'icons/icon-128.png',
-        title: 'Fullshot Pro',
-        message: 'Cannot capture Chrome system pages or Chrome Web Store. Please try on a regular website.'
-      });
-    } catch (e) {
-      console.warn("Could not create notification:", e);
+  );
+}
+
+function notifyRestrictedPage() {
+  try {
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon-128.png',
+      title: 'Fullshot Pro',
+      message: 'Cannot capture Chrome system pages or Chrome Web Store. Please try on a regular website.'
+    });
+  } catch (e) {
+    console.warn("Could not create notification:", e);
+  }
+}
+
+function createActionMenus() {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: MENU_SETTINGS,
+      title: 'Capture settings…',
+      contexts: ['action']
+    });
+    chrome.contextMenus.create({
+      id: MENU_VISIBLE,
+      title: 'Capture visible area',
+      contexts: ['action']
+    });
+  });
+}
+
+createActionMenus();
+chrome.runtime.onInstalled.addListener(createActionMenus);
+chrome.runtime.onStartup.addListener(createActionMenus);
+
+async function getActiveWebpageTab() {
+  try {
+    const win = await chrome.windows.getLastFocused({ populate: true, windowTypes: ['normal'] });
+    return (win.tabs || []).find((tab) => tab.active) || null;
+  } catch (e) {
+    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    return tab || null;
+  }
+}
+
+async function openCaptureSettings() {
+  const settingsUrl = chrome.runtime.getURL('popup.html');
+  try {
+    const popups = await chrome.windows.getAll({ populate: true, windowTypes: ['popup'] });
+    const existing = popups.find((win) =>
+      (win.tabs || []).some((tab) => tab.url && tab.url.startsWith(settingsUrl))
+    );
+    if (existing) {
+      await chrome.windows.update(existing.id, { focused: true });
+      return;
     }
+  } catch (e) {}
+
+  await chrome.windows.create({
+    url: settingsUrl,
+    type: 'popup',
+    width: 420,
+    height: 680,
+    focused: true
+  });
+}
+
+async function beginCaptureForTab(tab, captureType) {
+  if (!tab || !tab.id) {
+    tab = await getActiveWebpageTab();
+  }
+  if (!tab || !tab.id) return;
+  if (isRestrictedTabUrl(tab.url || '')) {
+    notifyRestrictedPage();
     return;
   }
+  await captureFullPage(tab, captureType);
+}
 
-  await captureFullPage(tab);
+chrome.action.onClicked.addListener((tab) => {
+  beginCaptureForTab(tab, 'fullpage');
+});
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === MENU_SETTINGS) {
+    openCaptureSettings();
+    return;
+  }
+  if (info.menuItemId === MENU_VISIBLE) {
+    beginCaptureForTab(tab, 'visible');
+  }
+});
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action !== 'capture_full_page') return;
+
+  (async () => {
+    let tab = null;
+    if (request.tabId) {
+      tab = await getFreshTab(request.tabId);
+    }
+    if (!tab || isRestrictedTabUrl((tab.url || ''))) {
+      tab = await getActiveWebpageTab();
+    }
+    await beginCaptureForTab(tab, request.captureType);
+  })();
+
+  sendResponse({ ok: true });
+  return true;
 });
 
 // Helper to send message with retry
@@ -77,6 +171,57 @@ async function cropCaptureDataUrl(dataUrl, rect, devicePixelRatio = 1) {
   }
 }
 
+async function getFreshTab(tabId) {
+  if (!tabId) return null;
+  try {
+    return await chrome.tabs.get(tabId);
+  } catch (e) {
+    return null;
+  }
+}
+
+async function openEditorBesideCaptureTab(sourceTab) {
+  const editorUrl = chrome.runtime.getURL('editor.html');
+  const windowId = sourceTab && sourceTab.windowId ? sourceTab.windowId : undefined;
+  const created = await chrome.tabs.create({
+    url: editorUrl,
+    active: true,
+    ...(windowId ? { windowId } : {})
+  });
+
+  if (!created || !created.id) return;
+
+  const placeBesideSource = async () => {
+    const latestSource = (await getFreshTab(sourceTab && sourceTab.id)) || sourceTab;
+    if (!latestSource || !Number.isInteger(latestSource.index)) return;
+    const targetIndex = latestSource.index + 1;
+    const latestEditor = await getFreshTab(created.id);
+    if (latestEditor && latestEditor.index === targetIndex && latestEditor.windowId === latestSource.windowId) {
+      return;
+    }
+    await chrome.tabs.move(created.id, {
+      index: targetIndex,
+      ...(latestSource.windowId ? { windowId: latestSource.windowId } : {})
+    });
+  };
+
+  try {
+    await placeBesideSource();
+  } catch (e) {
+    console.warn('Could not move editor tab beside the captured page:', e);
+  }
+
+  const groupId = sourceTab && sourceTab.groupId;
+  if (Number.isInteger(groupId) && groupId > -1) {
+    try {
+      await chrome.tabs.group({ tabIds: [created.id], groupId });
+      await placeBesideSource();
+    } catch (e) {
+      console.warn('Could not add editor tab to the captured tab group:', e);
+    }
+  }
+}
+
 function getCaptureFingerprint(dataUrl) {
   if (typeof dataUrl !== 'string' || dataUrl.length === 0) return '';
   const sample = dataUrl.length <= 512
@@ -92,7 +237,30 @@ function getCaptureFingerprint(dataUrl) {
   return `${dataUrl.length}:${hash >>> 0}`;
 }
 
-async function captureFullPage(tab) {
+async function captureVisibleTabPng(winId) {
+  return new Promise((resolve) => {
+    chrome.tabs.captureVisibleTab(winId, { format: 'png' }, (data) => {
+      if (chrome.runtime.lastError) {
+        const errMsg = chrome.runtime.lastError.message || "";
+        if (errMsg.includes("MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND") || errMsg.includes("quota") || errMsg.includes("exceeded")) {
+          resolve({ error: "quota", message: errMsg });
+        } else {
+          resolve(null);
+        }
+      } else {
+        resolve(data);
+      }
+    });
+  });
+}
+
+async function captureFullPage(tab, captureTypeOverride) {
+  const settings = await loadCaptureSettings();
+  if (captureTypeOverride === 'visible' || captureTypeOverride === 'fullpage') {
+    settings.captureType = captureTypeOverride;
+  }
+  const sleep = (ms) => new Promise((r) => setTimeout(r, Math.max(0, ms)));
+
   try {
     // Ensure tab is active and window focused for captureVisibleTab
     await chrome.tabs.update(tab.id, { active: true });
@@ -112,8 +280,14 @@ async function captureFullPage(tab) {
       files: ['content.js']
     });
 
+    // Ensure any open highlight or picker overlay is removed
+    await sendMessageWithRetry(tab.id, { action: "clear_highlight" });
+
     // 2. Initialize scrolling capture
-    const response = await sendMessageWithRetry(tab.id, { action: "start_scroll_capture" });
+    const response = await sendMessageWithRetry(tab.id, {
+      action: "start_scroll_capture",
+      settings
+    });
     if (!response) {
       console.error("Failed to start scrolling capture after retries");
       chrome.action.setBadgeText({ text: "ERR" });
@@ -135,17 +309,65 @@ async function captureFullPage(tab) {
       }
       return;
     }
+
+    await sleep(settings.startDelayMs);
+
+    const cropCurrentView = async (dataUrl) => {
+      const sliceTopInset = (settings.headerMode === 'once' || settings.headerMode === 'repeat')
+        ? 0
+        : (response.captureTopInset || 0);
+      const cropRect = response.targetRect || (
+        (sliceTopInset || response.captureBottomInset)
+          ? {
+            x: 0,
+            y: sliceTopInset,
+            width: response.targetWidth || 0,
+            height: (response.viewportHeight || 0) - sliceTopInset - (response.captureBottomInset || 0),
+            viewportWidth: response.targetWidth || 0,
+            viewportHeight: response.viewportHeight
+          }
+          : null
+      );
+      return cropRect
+        ? await cropCaptureDataUrl(dataUrl, cropRect, response.devicePixelRatio)
+        : dataUrl;
+    };
+
+    if (settings.captureType === 'visible') {
+      chrome.action.setBadgeText({ text: "100%" });
+      let dataUrl = await captureVisibleTabPng(tab.windowId || null);
+      if (dataUrl && dataUrl.error === 'quota') {
+        await sleep(800);
+        dataUrl = await captureVisibleTabPng(tab.windowId || null);
+      }
+      await sendMessageWithRetry(tab.id, { action: "restore_scroll", settings });
+      chrome.action.setBadgeText({ text: "" });
+      if (!dataUrl || dataUrl.error) {
+        throw new Error('Could not capture the visible area.');
+      }
+      await chrome.storage.local.remove(['captured_chunks', 'dimensions']);
+      await chrome.storage.local.set({
+        captured_chunks: [{
+          dataUrl: settings.cropToScrollTarget ? await cropCurrentView(dataUrl) : dataUrl,
+          scrollY: Math.max(0, Math.round(Number(response.originalScrollTop) || 0))
+        }],
+        dimensions: { ...response, totalPages: 1, totalHeight: response.viewportHeight }
+      });
+      const sourceTab = (await getFreshTab(tab.id)) || tab;
+      await openEditorBesideCaptureTab(sourceTab);
+      return;
+    }
     
     let { totalHeight, viewportHeight } = response;
     const topInset = Math.max(0, response.captureTopInset || 0);
     const bottomInset = Math.max(0, response.captureBottomInset || 0);
     const effectiveHeight = Math.max(80, response.effectiveViewportHeight || (viewportHeight - topInset - bottomInset));
-    // Keep a deliberate overlap between slices so moving content is less
-    // likely to be cut exactly at a stitch boundary.
-    const stepHeight = Math.max(80, Math.round(effectiveHeight * 0.72));
+    const overlapRatio = Math.min(0.6, Math.max(0, settings.overlapPercent / 100));
+    const stepHeight = Math.max(80, Math.round(effectiveHeight * (1 - overlapRatio)));
+    const maxSlices = settings.captureType === 'visible' ? 1 : settings.maxSlices;
     let totalPages = Math.min(
-      40,
-      totalHeight <= viewportHeight
+      maxSlices,
+      totalHeight <= viewportHeight || settings.captureType === 'visible'
         ? 1
         : Math.ceil((totalHeight - viewportHeight) / stepHeight) + 1
     );
@@ -165,7 +387,8 @@ async function captureFullPage(tab) {
       const scrollRes = await sendMessageWithRetry(tab.id, { 
         action: "scroll_to", 
         index: i,
-        targetY: targetY 
+        targetY: targetY,
+        settings
       });
       if (!scrollRes || scrollRes.actualScrollY === undefined) {
         console.warn('Skipping capture because the page did not confirm the requested scroll position.', {
@@ -179,7 +402,7 @@ async function captureFullPage(tab) {
       } else if (Number.isFinite(scrollRes.totalHeight) && scrollRes.totalHeight > totalHeight) {
         totalHeight = scrollRes.totalHeight;
         totalPages = Math.min(
-          40,
+          maxSlices,
           Math.max(
             totalPages,
             totalHeight <= viewportHeight
@@ -188,27 +411,14 @@ async function captureFullPage(tab) {
           )
         );
       }
-      // Settle delay for scrolling and rendering
-      await new Promise(r => setTimeout(r, 600));
+      const atLastSlice = i === totalPages - 1 || targetY >= totalHeight - viewportHeight;
+      await sleep(settings.settleDelayMs + (atLastSlice ? settings.bottomWaitMs : 0));
       
       // Capture visual viewport chunk with backoff retry
       let dataUrl = null;
       const maxRetries = 4;
       for (let attempt = 0; attempt < maxRetries; attempt++) {
-        dataUrl = await new Promise((resolve) => {
-          chrome.tabs.captureVisibleTab(winId, { format: 'png' }, (data) => {
-            if (chrome.runtime.lastError) {
-              const errMsg = chrome.runtime.lastError.message || "";
-              if (errMsg.includes("MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND") || errMsg.includes("quota") || errMsg.includes("exceeded")) {
-                resolve({ error: "quota", message: errMsg });
-              } else {
-                resolve(null);
-              }
-            } else {
-              resolve(data);
-            }
-          });
-        });
+        dataUrl = await captureVisibleTabPng(winId);
 
         if (dataUrl && dataUrl.error === "quota") {
           const backoff = 800 + (attempt * 600);
@@ -224,20 +434,21 @@ async function captureFullPage(tab) {
       if (dataUrl) {
         let actualScrollY = scrollRes.actualScrollY;
         const normalizedScrollY = Math.max(0, Math.round(Number(actualScrollY) || 0));
-        const duplicateScroll = lastCapturedScrollY !== null &&
+        const duplicateScroll = settings.skipDuplicateFrames && lastCapturedScrollY !== null &&
           Math.abs(normalizedScrollY - lastCapturedScrollY) <= 2;
 
         // Never add the same viewport twice. This is common on pages whose
         // scroll handler is still rendering when captureVisibleTab runs.
         if (duplicateScroll) {
-          await new Promise(r => setTimeout(r, 350));
+          await sleep(Math.max(200, Math.round(settings.settleDelayMs / 2)));
           const retryScroll = await sendMessageWithRetry(tab.id, {
             action: "scroll_to",
             index: i,
             targetY: Math.min(
               Math.max(targetY, lastCapturedScrollY + Math.max(80, Math.round(stepHeight / 2))),
               Math.max(0, totalHeight - viewportHeight)
-            )
+            ),
+            settings
           });
           const retryY = retryScroll && retryScroll.actualScrollY !== undefined
             ? Math.max(0, Math.round(Number(retryScroll.actualScrollY) || 0))
@@ -246,13 +457,9 @@ async function captureFullPage(tab) {
             break;
           }
           actualScrollY = retryY;
-          await new Promise(r => setTimeout(r, 250));
-          dataUrl = await new Promise((resolve) => {
-            chrome.tabs.captureVisibleTab(winId, { format: 'png' }, (data) => {
-              resolve(chrome.runtime.lastError ? null : data);
-            });
-          });
-          if (!dataUrl) {
+          await sleep(Math.max(150, Math.round(settings.settleDelayMs / 3)));
+          dataUrl = await captureVisibleTabPng(winId);
+          if (!dataUrl || dataUrl.error) {
             break;
           }
         }
@@ -261,28 +468,25 @@ async function captureFullPage(tab) {
         // has painted the new viewport. Do not stitch an identical frame as a
         // new slice; give the page another scroll/render/capture opportunity.
         let captureFingerprint = getCaptureFingerprint(dataUrl);
-        if (lastCaptureFingerprint && captureFingerprint === lastCaptureFingerprint) {
-          await new Promise(r => setTimeout(r, 500));
+        if (settings.skipDuplicateFrames && lastCaptureFingerprint && captureFingerprint === lastCaptureFingerprint) {
+          await sleep(Math.max(300, settings.settleDelayMs));
           const repaintScroll = await sendMessageWithRetry(tab.id, {
             action: "scroll_to",
             index: i,
             targetY: Math.min(
               Math.max(targetY, normalizedScrollY + Math.max(40, Math.round(stepHeight / 3))),
               Math.max(0, totalHeight - viewportHeight)
-            )
+            ),
+            settings
           });
           if (repaintScroll && repaintScroll.actualScrollY !== undefined) {
             actualScrollY = repaintScroll.actualScrollY;
-            await new Promise(r => setTimeout(r, 700));
-            dataUrl = await new Promise((resolve) => {
-              chrome.tabs.captureVisibleTab(winId, { format: "png" }, (data) => {
-                resolve(chrome.runtime.lastError ? null : data);
-              });
-            });
+            await sleep(Math.max(400, settings.settleDelayMs));
+            dataUrl = await captureVisibleTabPng(winId);
             captureFingerprint = getCaptureFingerprint(dataUrl);
           }
         }
-        if (!dataUrl || (lastCaptureFingerprint && captureFingerprint === lastCaptureFingerprint)) {
+        if (!dataUrl || (settings.skipDuplicateFrames && lastCaptureFingerprint && captureFingerprint === lastCaptureFingerprint)) {
           console.warn("Skipping visually duplicate capture slice", {
             index: i,
             scrollY: actualScrollY
@@ -290,13 +494,16 @@ async function captureFullPage(tab) {
           break;
         }
 
+        const sliceTopInset = (i === 0 && (settings.headerMode === 'once' || settings.headerMode === 'repeat'))
+          ? 0
+          : topInset;
         const cropRect = response.targetRect || (
-          topInset || bottomInset
+          (sliceTopInset || bottomInset)
             ? {
               x: 0,
-              y: topInset,
+              y: sliceTopInset,
               width: response.targetWidth || 0,
-              height: viewportHeight - topInset - bottomInset,
+              height: viewportHeight - sliceTopInset - bottomInset,
               viewportWidth: response.targetWidth || 0,
               viewportHeight: viewportHeight
             }
@@ -309,8 +516,8 @@ async function captureFullPage(tab) {
           dataUrl: croppedDataUrl,
           scrollY: Math.max(0, Math.round(Number(actualScrollY) || 0))
         };
-        if (!response.targetRect && (topInset || bottomInset)) {
-          chunk.contentOffsetY = topInset;
+        if (!response.targetRect && (sliceTopInset || bottomInset)) {
+          chunk.contentOffsetY = sliceTopInset;
         }
         capturedChunks.push(chunk);
         lastCapturedScrollY = chunk.scrollY;
@@ -324,7 +531,7 @@ async function captureFullPage(tab) {
     }
 
     // Restore original scroll position and elements
-    await sendMessageWithRetry(tab.id, { action: "restore_scroll" });
+    await sendMessageWithRetry(tab.id, { action: "restore_scroll", settings });
 
     // Clear badge
     chrome.action.setBadgeText({ text: "" });
@@ -337,15 +544,13 @@ async function captureFullPage(tab) {
     }
 
     // Clear previous chunks first to keep memory clean, then store and open editor
-    chrome.storage.local.remove(['captured_chunks', 'dimensions'], () => {
-      chrome.storage.local.set({ 
-        captured_chunks: capturedChunks, 
-        dimensions: response 
-      }, () => {
-        const editorUrl = chrome.runtime.getURL('editor.html');
-        chrome.tabs.create({ url: editorUrl });
-      });
+    await chrome.storage.local.remove(['captured_chunks', 'dimensions']);
+    await chrome.storage.local.set({
+      captured_chunks: capturedChunks,
+      dimensions: response
     });
+    const sourceTab = (await getFreshTab(tab.id)) || tab;
+    await openEditorBesideCaptureTab(sourceTab);
   } catch (err) {
     console.error("Capture failed:", err);
     chrome.action.setBadgeText({ text: "ERR" });
