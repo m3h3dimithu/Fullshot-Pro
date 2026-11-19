@@ -131,6 +131,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       currentCaptureControl.resumeResolve();
       currentCaptureControl.resumeResolve = null;
     }
+    chrome.runtime.sendMessage({ action: 'capture_progress', status: '⏹️ Finishing capture…' }).catch(() => {});
     sendResponse({ ok: true });
     return true;
   }
@@ -147,6 +148,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === 'pause_capture') {
     currentCaptureControl.isPaused = true;
+    chrome.runtime.sendMessage({ action: 'capture_progress', isPaused: true }).catch(() => {});
     sendResponse({ ok: true });
     return true;
   }
@@ -157,6 +159,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       currentCaptureControl.resumeResolve();
       currentCaptureControl.resumeResolve = null;
     }
+    chrome.runtime.sendMessage({ action: 'capture_progress', isPaused: false }).catch(() => {});
     sendResponse({ ok: true });
     return true;
   }
@@ -315,6 +318,62 @@ async function captureFullPage(tab, captureTypeOverride) {
   }
   const sleep = (ms) => new Promise((r) => setTimeout(r, Math.max(0, ms)));
 
+  currentCaptureControl = {
+    tabId: tab.id,
+    isPaused: false,
+    isStopped: false,
+    isCancelled: false,
+    resumeResolve: null
+  };
+
+  const interruptibleSleep = async (ms) => {
+    const start = Date.now();
+    while (Date.now() - start < ms) {
+      if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
+        return;
+      }
+      while (currentCaptureControl.isPaused && !currentCaptureControl.isCancelled && !currentCaptureControl.isStopped) {
+        await new Promise((r) => {
+          currentCaptureControl.resumeResolve = r;
+          setTimeout(r, 50);
+        });
+      }
+      const remaining = ms - (Date.now() - start);
+      if (remaining <= 0) break;
+      await new Promise((r) => setTimeout(r, Math.min(40, remaining)));
+    }
+  };
+
+  let controllerWindowId = null;
+  const broadcastProgress = (info) => {
+    chrome.runtime.sendMessage({
+      action: 'capture_progress',
+      ...info
+    }).catch(() => {});
+  };
+
+  const closeControllerWindow = async () => {
+    if (controllerWindowId) {
+      const id = controllerWindowId;
+      controllerWindowId = null;
+      try {
+        await chrome.windows.remove(id);
+      } catch (e) {}
+    }
+  };
+
+  const windowRemoveListener = (removedWinId) => {
+    if (removedWinId === controllerWindowId) {
+      controllerWindowId = null;
+      currentCaptureControl.isCancelled = true;
+      if (currentCaptureControl.resumeResolve) {
+        currentCaptureControl.resumeResolve();
+        currentCaptureControl.resumeResolve = null;
+      }
+    }
+  };
+  chrome.windows.onRemoved.addListener(windowRemoveListener);
+
   try {
     // Ensure tab is active and window focused for captureVisibleTab
     await chrome.tabs.update(tab.id, { active: true });
@@ -364,7 +423,7 @@ async function captureFullPage(tab, captureTypeOverride) {
       return;
     }
 
-    await sleep(settings.startDelayMs);
+    await interruptibleSleep(settings.startDelayMs);
 
     const cropCurrentView = async (dataUrl) => {
       const sliceTopInset = (settings.headerMode === 'once' || settings.headerMode === 'repeat')
@@ -411,14 +470,25 @@ async function captureFullPage(tab, captureTypeOverride) {
       await openEditorBesideCaptureTab(sourceTab);
       return;
     }
-    
-    currentCaptureControl = {
-      tabId: tab.id,
-      isPaused: false,
-      isStopped: false,
-      isCancelled: false,
-      resumeResolve: null
-    };
+
+    // Launch floating capture controller window outside the webpage
+    try {
+      const parentWin = await chrome.windows.get(tab.windowId || chrome.windows.WINDOW_ID_CURRENT).catch(() => null);
+      const left = parentWin ? Math.max(10, (parentWin.left || 0) + (parentWin.width || 1200) - 400) : 100;
+      const top = parentWin ? Math.max(10, (parentWin.top || 0) + 35) : 35;
+      const ctrlWin = await chrome.windows.create({
+        url: chrome.runtime.getURL('capture-controller.html'),
+        type: 'popup',
+        width: 380,
+        height: 165,
+        left,
+        top,
+        focused: false
+      });
+      controllerWindowId = ctrlWin ? ctrlWin.id : null;
+    } catch (e) {
+      console.warn('Could not create controller window:', e);
+    }
 
     let { totalHeight, viewportHeight } = response;
     const topInset = Math.max(0, response.captureTopInset || 0);
@@ -445,6 +515,13 @@ async function captureFullPage(tab, captureTypeOverride) {
 
     const winId = tab.windowId || null;
 
+    broadcastProgress({
+      currentSlice: 1,
+      totalSlices: totalPages,
+      pct: 0,
+      isPaused: false
+    });
+
     for (let i = 0; i < totalPages; i++) {
       if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
         break;
@@ -452,7 +529,7 @@ async function captureFullPage(tab, captureTypeOverride) {
       while (currentCaptureControl.isPaused && !currentCaptureControl.isCancelled && !currentCaptureControl.isStopped) {
         await new Promise((r) => {
           currentCaptureControl.resumeResolve = r;
-          setTimeout(r, 200);
+          setTimeout(r, 100);
         });
       }
       if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
@@ -461,10 +538,7 @@ async function captureFullPage(tab, captureTypeOverride) {
 
       const pct = Math.round(((i + 1) / totalPages) * 100);
       chrome.action.setBadgeText({ text: pct + "%" });
-
-      // Update progress overlay on webpage
-      await sendMessageWithRetry(tab.id, {
-        action: "update_capture_overlay",
+      broadcastProgress({
         currentSlice: i + 1,
         totalSlices: totalPages,
         pct,
@@ -503,37 +577,36 @@ async function captureFullPage(tab, captureTypeOverride) {
         );
       }
       const atLastSlice = i === totalPages - 1 || targetY >= totalHeight - viewportHeight;
-      await sleep(settings.settleDelayMs + (atLastSlice ? settings.bottomWaitMs : 0));
-      
-      // Temporarily hide progress widget during snapshot so it never appears in the captured image
-      await sendMessageWithRetry(tab.id, { action: "hide_capture_overlay" });
+      await interruptibleSleep(settings.settleDelayMs + (atLastSlice ? settings.bottomWaitMs : 0));
+
+      if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
+        break;
+      }
 
       // Capture visual viewport chunk with backoff retry
       let dataUrl = null;
       const maxRetries = 4;
       for (let attempt = 0; attempt < maxRetries; attempt++) {
+        if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
+          break;
+        }
         dataUrl = await captureVisibleTabPng(winId);
 
         if (dataUrl && dataUrl.error === "quota") {
           const backoff = 800 + (attempt * 600);
-          await new Promise(r => setTimeout(r, backoff));
+          await interruptibleSleep(backoff);
           dataUrl = null;
         } else if (dataUrl) {
           break;
         } else {
-          await new Promise(r => setTimeout(r, 400));
+          await interruptibleSleep(400);
         }
       }
 
-      // Show progress overlay again after frame is captured
-      await sendMessageWithRetry(tab.id, {
-        action: "update_capture_overlay",
-        currentSlice: i + 1,
-        totalSlices: totalPages,
-        pct,
-        isPaused: currentCaptureControl.isPaused
-      });
-      
+      if (currentCaptureControl.isCancelled) {
+        break;
+      }
+
       if (dataUrl) {
         let actualScrollY = scrollRes.actualScrollY;
         const normalizedScrollY = Math.max(0, Math.round(Number(actualScrollY) || 0));
@@ -541,7 +614,10 @@ async function captureFullPage(tab, captureTypeOverride) {
           Math.abs(normalizedScrollY - lastCapturedScrollY) <= 2;
 
         if (duplicateScroll) {
-          await sleep(Math.max(200, Math.round(settings.settleDelayMs / 2)));
+          await interruptibleSleep(Math.max(200, Math.round(settings.settleDelayMs / 2)));
+          if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
+            break;
+          }
           const retryScroll = await sendMessageWithRetry(tab.id, {
             action: "scroll_to",
             index: i,
@@ -558,7 +634,10 @@ async function captureFullPage(tab, captureTypeOverride) {
             break;
           }
           actualScrollY = retryY;
-          await sleep(Math.max(150, Math.round(settings.settleDelayMs / 3)));
+          await interruptibleSleep(Math.max(150, Math.round(settings.settleDelayMs / 3)));
+          if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
+            break;
+          }
           dataUrl = await captureVisibleTabPng(winId);
           if (!dataUrl || dataUrl.error) {
             break;
@@ -567,7 +646,10 @@ async function captureFullPage(tab, captureTypeOverride) {
 
         let captureFingerprint = getCaptureFingerprint(dataUrl);
         if (settings.skipDuplicateFrames && lastCaptureFingerprint && captureFingerprint === lastCaptureFingerprint) {
-          await sleep(Math.max(300, settings.settleDelayMs));
+          await interruptibleSleep(Math.max(300, settings.settleDelayMs));
+          if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
+            break;
+          }
           const repaintScroll = await sendMessageWithRetry(tab.id, {
             action: "scroll_to",
             index: i,
@@ -579,7 +661,10 @@ async function captureFullPage(tab, captureTypeOverride) {
           });
           if (repaintScroll && repaintScroll.actualScrollY !== undefined) {
             actualScrollY = repaintScroll.actualScrollY;
-            await sleep(Math.max(400, settings.settleDelayMs));
+            await interruptibleSleep(Math.max(400, settings.settleDelayMs));
+            if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
+              break;
+            }
             dataUrl = await captureVisibleTabPng(winId);
             captureFingerprint = getCaptureFingerprint(dataUrl);
           }
@@ -628,9 +713,6 @@ async function captureFullPage(tab, captureTypeOverride) {
       }
     }
 
-    // Remove floating progress overlay
-    await sendMessageWithRetry(tab.id, { action: "remove_capture_overlay" });
-
     // Restore original scroll position and elements
     await sendMessageWithRetry(tab.id, { action: "restore_scroll", settings });
 
@@ -672,5 +754,8 @@ async function captureFullPage(tab, captureTypeOverride) {
         message: 'Capture failed: ' + (err.message || err)
       });
     } catch (e) {}
+  } finally {
+    chrome.windows.onRemoved.removeListener(windowRemoveListener);
+    await closeControllerWindow();
   }
 }
