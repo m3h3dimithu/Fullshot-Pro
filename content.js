@@ -434,42 +434,99 @@ function showCaptureOverlay(data) {
     overlay = document.createElement('div');
     overlay.id = 'fullshot-capture-progress-widget';
     overlay.style.position = 'fixed';
-    overlay.style.top = '16px';
-    overlay.style.right = '20px';
+    overlay.style.top = '20px';
+    overlay.style.right = '24px';
     overlay.style.zIndex = '2147483647';
     overlay.style.background = '#0f172a';
     overlay.style.color = '#f8fafc';
     overlay.style.border = '2px solid #6366f1';
     overlay.style.borderRadius = '999px';
-    overlay.style.padding = '6px 14px';
-    overlay.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.6)';
+    overlay.style.padding = '8px 16px';
+    overlay.style.boxShadow = '0 10px 32px rgba(0, 0, 0, 0.65)';
     overlay.style.display = 'flex';
     overlay.style.alignItems = 'center';
     overlay.style.gap = '10px';
     overlay.style.font = '600 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     overlay.style.userSelect = 'none';
+    overlay.style.cursor = 'grab';
     overlay.style.transition = 'opacity 0.15s ease';
+
+    // Drag support so user can move it anywhere on screen
+    let isDragging = false;
+    let dragStartX = 0, dragStartY = 0;
+    let initialLeft = 0, initialTop = 0;
+
+    overlay.onmousedown = (e) => {
+      if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      const rect = overlay.getBoundingClientRect();
+      initialLeft = rect.left;
+      initialTop = rect.top;
+      overlay.style.cursor = 'grabbing';
+    };
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      overlay.style.right = 'auto';
+      overlay.style.bottom = 'auto';
+      overlay.style.left = `${Math.max(10, Math.min(window.innerWidth - overlay.offsetWidth - 10, initialLeft + dx))}px`;
+      overlay.style.top = `${Math.max(10, Math.min(window.innerHeight - overlay.offsetHeight - 10, initialTop + dy))}px`;
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        overlay.style.cursor = 'grab';
+      }
+    });
+
+    // Keyboard shortcuts during capture
+    if (!window._fullshotCaptureKeyHandler) {
+      window._fullshotCaptureKeyHandler = (e) => {
+        const w = document.getElementById('fullshot-capture-progress-widget');
+        if (!w || w.style.visibility === 'hidden') return;
+        if (e.code === 'Space') {
+          e.preventDefault();
+          const btn = w.querySelector('#fullshot-btn-pause');
+          if (btn) btn.click();
+        } else if (e.code === 'Enter') {
+          e.preventDefault();
+          const btn = w.querySelector('#fullshot-btn-stop');
+          if (btn) btn.click();
+        } else if (e.code === 'Escape') {
+          e.preventDefault();
+          const btn = w.querySelector('#fullshot-btn-cancel');
+          if (btn) btn.click();
+        }
+      };
+      window.addEventListener('keydown', window._fullshotCaptureKeyHandler, true);
+    }
 
     (document.body || document.documentElement).appendChild(overlay);
   }
 
-  overlay.style.display = 'flex';
-  overlay.style.opacity = '1';
+  overlay.style.setProperty('display', 'flex', 'important');
+  overlay.style.setProperty('visibility', 'visible', 'important');
+  overlay.style.setProperty('opacity', '1', 'important');
 
   const sliceText = data.totalSlices ? `Slice ${data.currentSlice || 1}/${data.totalSlices} (${data.pct || 0}%)` : 'Capturing…';
   const statusText = data.isPaused ? `⏸️ Paused (${sliceText})` : `📸 ${sliceText}`;
 
   overlay.innerHTML = `
-    <span style="color: #e0e7ff; display: flex; align-items: center; gap: 6px;">
+    <span style="color: #e0e7ff; display: flex; align-items: center; gap: 6px; pointer-events: none;">
       <span>${statusText}</span>
     </span>
-    <button id="fullshot-btn-pause" type="button" style="background: #312e81; color: #c7d2fe; border: 1px solid #4f46e5; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer;">
+    <button id="fullshot-btn-pause" type="button" style="background: #312e81; color: #c7d2fe; border: 1px solid #4f46e5; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer;" title="Toggle pause / resume [Space]">
       ${data.isPaused ? '▶️ Resume' : '⏸️ Pause'}
     </button>
-    <button id="fullshot-btn-stop" type="button" style="background: #059669; color: #ffffff; border: none; border-radius: 999px; padding: 4px 12px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Finish and view screenshot now">
+    <button id="fullshot-btn-stop" type="button" style="background: #059669; color: #ffffff; border: none; border-radius: 999px; padding: 4px 12px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Finish and view screenshot now [Enter]">
       ⏹️ Stop & View
     </button>
-    <button id="fullshot-btn-cancel" type="button" style="background: #dc2626; color: #ffffff; border: none; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer;" title="Cancel capture">
+    <button id="fullshot-btn-cancel" type="button" style="background: #dc2626; color: #ffffff; border: none; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer;" title="Cancel capture [Esc]">
       ✕ Cancel
     </button>
   `;
@@ -501,7 +558,7 @@ function showCaptureOverlay(data) {
 function hideCaptureOverlay() {
   const overlay = document.getElementById('fullshot-capture-progress-widget');
   if (overlay) {
-    overlay.style.display = 'none';
+    overlay.style.setProperty('visibility', 'hidden', 'important');
   }
 }
 
@@ -509,6 +566,10 @@ function removeCaptureOverlay() {
   const overlay = document.getElementById('fullshot-capture-progress-widget');
   if (overlay) {
     overlay.remove();
+  }
+  if (window._fullshotCaptureKeyHandler) {
+    window.removeEventListener('keydown', window._fullshotCaptureKeyHandler, true);
+    window._fullshotCaptureKeyHandler = null;
   }
 }
 
@@ -1023,6 +1084,8 @@ function hidePersistentBars() {
     elements.forEach((el) => {
       try {
         if (el.tagName === 'BODY' || el.tagName === 'HTML') return;
+        if (el.id && (el.id.startsWith('fullshot-') || el.id.includes('fullshot'))) return;
+        if (el.closest && el.closest('[id^="fullshot-"]')) return;
         const style = window.getComputedStyle(el);
         if (!style || style.display === 'none') return;
 
