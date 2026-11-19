@@ -330,7 +330,7 @@ function clearHighlightAndPicker() {
   }
 }
 
-function highlightTargetSection(settings) {
+function highlightTargetSection(settings, autoFade = false) {
   clearHighlightAndPicker();
   const analysis = analyzePageForCapture(settings);
   const highlighter = document.createElement('div');
@@ -413,17 +413,103 @@ function highlightTargetSection(settings) {
   pill.appendChild(closeBtn);
 
   highlighter.appendChild(pill);
-  document.documentElement.appendChild(highlighter);
+  (document.body || document.documentElement).appendChild(highlighter);
 
   clearTimeout(window._fullshotHighlightTimer);
-  window._fullshotHighlightTimer = setTimeout(() => {
-    if (highlighter.parentElement) {
-      highlighter.style.opacity = '0';
-      setTimeout(() => highlighter.remove(), 400);
-    }
-  }, 4000);
+  if (autoFade) {
+    window._fullshotHighlightTimer = setTimeout(() => {
+      if (highlighter.parentElement) {
+        highlighter.style.opacity = '0';
+        setTimeout(() => highlighter.remove(), 400);
+      }
+    }, 4000);
+  }
 
   return analysis;
+}
+
+function showCaptureOverlay(data) {
+  let overlay = document.getElementById('fullshot-capture-progress-widget');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'fullshot-capture-progress-widget';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '16px';
+    overlay.style.right = '20px';
+    overlay.style.zIndex = '2147483647';
+    overlay.style.background = '#0f172a';
+    overlay.style.color = '#f8fafc';
+    overlay.style.border = '2px solid #6366f1';
+    overlay.style.borderRadius = '999px';
+    overlay.style.padding = '6px 14px';
+    overlay.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.6)';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.gap = '10px';
+    overlay.style.font = '600 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    overlay.style.userSelect = 'none';
+    overlay.style.transition = 'opacity 0.15s ease';
+
+    (document.body || document.documentElement).appendChild(overlay);
+  }
+
+  overlay.style.display = 'flex';
+  overlay.style.opacity = '1';
+
+  const sliceText = data.totalSlices ? `Slice ${data.currentSlice || 1}/${data.totalSlices} (${data.pct || 0}%)` : 'Capturing…';
+  const statusText = data.isPaused ? `⏸️ Paused (${sliceText})` : `📸 ${sliceText}`;
+
+  overlay.innerHTML = `
+    <span style="color: #e0e7ff; display: flex; align-items: center; gap: 6px;">
+      <span>${statusText}</span>
+    </span>
+    <button id="fullshot-btn-pause" type="button" style="background: #312e81; color: #c7d2fe; border: 1px solid #4f46e5; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer;">
+      ${data.isPaused ? '▶️ Resume' : '⏸️ Pause'}
+    </button>
+    <button id="fullshot-btn-stop" type="button" style="background: #059669; color: #ffffff; border: none; border-radius: 999px; padding: 4px 12px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Finish and view screenshot now">
+      ⏹️ Stop & View
+    </button>
+    <button id="fullshot-btn-cancel" type="button" style="background: #dc2626; color: #ffffff; border: none; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer;" title="Cancel capture">
+      ✕ Cancel
+    </button>
+  `;
+
+  const pauseBtn = overlay.querySelector('#fullshot-btn-pause');
+  const stopBtn = overlay.querySelector('#fullshot-btn-stop');
+  const cancelBtn = overlay.querySelector('#fullshot-btn-cancel');
+
+  if (pauseBtn) {
+    pauseBtn.onclick = (e) => {
+      e.stopPropagation();
+      chrome.runtime.sendMessage({ action: data.isPaused ? 'resume_capture' : 'pause_capture' });
+    };
+  }
+  if (stopBtn) {
+    stopBtn.onclick = (e) => {
+      e.stopPropagation();
+      chrome.runtime.sendMessage({ action: 'stop_capture' });
+    };
+  }
+  if (cancelBtn) {
+    cancelBtn.onclick = (e) => {
+      e.stopPropagation();
+      chrome.runtime.sendMessage({ action: 'cancel_capture' });
+    };
+  }
+}
+
+function hideCaptureOverlay() {
+  const overlay = document.getElementById('fullshot-capture-progress-widget');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
+}
+
+function removeCaptureOverlay() {
+  const overlay = document.getElementById('fullshot-capture-progress-widget');
+  if (overlay) {
+    overlay.remove();
+  }
 }
 
 function showToast(text) {
@@ -631,7 +717,7 @@ window.screenCaptureListener = (request, sender, sendResponse) => {
   }
 
   if (request.action === "highlight_target") {
-    const analysis = highlightTargetSection(getFullshotSettings(request));
+    const analysis = highlightTargetSection(getFullshotSettings(request), request.autoFade || false);
     sendResponse({
       captureMode: analysis.captureMode,
       hasOverlay: analysis.hasOverlay,
@@ -644,6 +730,24 @@ window.screenCaptureListener = (request, sender, sendResponse) => {
       targetDimensions: analysis.targetDimensions,
       scrollablePages: analysis.scrollablePages
     });
+    return true;
+  }
+
+  if (request.action === "update_capture_overlay") {
+    showCaptureOverlay(request);
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === "hide_capture_overlay") {
+    hideCaptureOverlay();
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === "remove_capture_overlay") {
+    removeCaptureOverlay();
+    sendResponse({ success: true });
     return true;
   }
 
@@ -855,6 +959,7 @@ window.screenCaptureListener = (request, sender, sendResponse) => {
   }
 
   if (request.action === "restore_scroll") {
+    removeCaptureOverlay();
     const isWindow = window.captureIsWindowScroll !== false;
     const targetEl = window.captureScrollTarget;
     const scrollRoot = document.scrollingElement || document.documentElement || document.body;

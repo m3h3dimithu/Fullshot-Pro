@@ -51,6 +51,9 @@ function renderSettings() {
   $('scrollTarget').value = settings.scrollTarget;
   $('selector').value = settings.selector;
   $('selectorField').hidden = settings.scrollTarget !== 'selector';
+  if ($('startPosition')) {
+    $('startPosition').value = settings.startPosition || 'top';
+  }
   $('settleDelayMs').value = settings.settleDelayMs;
   $('startDelayMs').value = settings.startDelayMs;
   $('bottomWaitMs').value = settings.bottomWaitMs;
@@ -96,12 +99,18 @@ function queueSave(flashHighlight = false) {
 
 async function getWebpageTab() {
   try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab && tab.id && !tab.url.startsWith(chrome.runtime.getURL(''))) return tab;
+  } catch (e) {}
+
+  try {
     const win = await chrome.windows.getLastFocused({ populate: true, windowTypes: ['normal'] });
-    return (win.tabs || []).find((tab) => tab.active) || null;
-  } catch (e) {
-    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    return tab || null;
-  }
+    const tab = (win.tabs || []).find((t) => t.active && !t.url.startsWith(chrome.runtime.getURL('')));
+    if (tab) return tab;
+  } catch (e) {}
+
+  const [tab] = await chrome.tabs.query({ active: true });
+  return tab || null;
 }
 
 async function requestTargetHighlight(flashHighlight = false) {
@@ -124,7 +133,7 @@ async function requestTargetHighlight(flashHighlight = false) {
 
     const action = flashHighlight ? 'highlight_target' : 'inspect_page';
     let res = await new Promise((resolve) => {
-      chrome.tabs.sendMessage(tab.id, { action, settings }, (r) => {
+      chrome.tabs.sendMessage(tab.id, { action, settings, autoFade: false }, (r) => {
         if (chrome.runtime.lastError) resolve(null);
         else resolve(r);
       });
@@ -136,7 +145,7 @@ async function requestTargetHighlight(flashHighlight = false) {
         files: ['content.js']
       });
       res = await new Promise((resolve) => {
-        chrome.tabs.sendMessage(tab.id, { action, settings }, (r) => {
+        chrome.tabs.sendMessage(tab.id, { action, settings, autoFade: false }, (r) => {
           if (chrome.runtime.lastError) resolve(null);
           else resolve(r);
         });
@@ -167,6 +176,12 @@ function bindControls() {
     settings.selector = e.target.value;
     queueSave(true);
   });
+  if ($('startPosition')) {
+    $('startPosition').addEventListener('change', (e) => {
+      settings.startPosition = e.target.value;
+      queueSave(true);
+    });
+  }
   ['settleDelayMs', 'startDelayMs', 'bottomWaitMs', 'overlapPercent', 'maxSlices', 'scrollRetries'].forEach((id) => {
     $(id).addEventListener('input', (e) => {
       settings[id] = Number(e.target.value);
@@ -266,6 +281,15 @@ async function startCapture(captureType) {
   settings.captureType = captureType;
   settings = await saveCaptureSettings(settings);
   showStatus('');
+
+  // Clear highlight immediately before starting capture so the border is never in the screenshot!
+  try {
+    const tab = await getWebpageTab();
+    if (tab && tab.id) {
+      await chrome.tabs.sendMessage(tab.id, { action: 'clear_highlight' }).catch(() => {});
+    }
+  } catch (e) {}
+
   try {
     const tab = await getWebpageTab();
     if (!tab || !tab.id) {
@@ -309,11 +333,19 @@ async function inspectActiveTab() {
       target: { tabId: tab.id },
       files: ['content.js']
     });
-    await requestTargetHighlight(false);
+    // Mark the target section by DEFAULT when panel opens!
+    await requestTargetHighlight(true);
   } catch (e) {
     hint.textContent = 'Could not inspect this tab. You can still capture after a refresh.';
   }
 }
+
+// Clean up highlight when popup closes without capturing
+window.addEventListener('beforeunload', () => {
+  if (currentTabId) {
+    chrome.tabs.sendMessage(currentTabId, { action: 'clear_highlight' }).catch(() => {});
+  }
+});
 
 // Listen to storage changes so if the user picks an element on the page, the popup immediately reflects it!
 if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
@@ -321,7 +353,7 @@ if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged)
     if (areaName === 'local' && changes.capture_settings && changes.capture_settings.newValue) {
       settings = normalizeCaptureSettings(changes.capture_settings.newValue);
       renderSettings();
-      requestTargetHighlight(false);
+      requestTargetHighlight(true);
     }
   });
 }

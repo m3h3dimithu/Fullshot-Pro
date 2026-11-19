@@ -2,6 +2,7 @@ const FULLSHOT_SETTINGS_KEY = 'capture_settings';
 
 const FULLSHOT_DEFAULT_SETTINGS = {
   captureType: 'fullpage',
+  startPosition: 'top',
   layoutPreset: 'auto',
   scrollTarget: 'auto',
   selector: '',
@@ -134,6 +135,7 @@ function applyLayoutPreset(settings, layoutPreset) {
 function normalizeCaptureSettings(raw) {
   const merged = { ...FULLSHOT_DEFAULT_SETTINGS, ...(raw || {}) };
   merged.captureType = merged.captureType === 'visible' ? 'visible' : 'fullpage';
+  merged.startPosition = ['top', 'current'].includes(merged.startPosition) ? merged.startPosition : 'top';
   merged.layoutPreset = FULLSHOT_LAYOUT_PRESETS[merged.layoutPreset] ? merged.layoutPreset : 'auto';
   merged.scrollTarget = ['auto', 'window', 'container', 'popup', 'selector'].includes(merged.scrollTarget)
     ? merged.scrollTarget

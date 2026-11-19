@@ -2,33 +2,36 @@
 
 ## 1. Current State of the Codebase
 - **Status**: Production-ready, fully functional Chrome MV3 extension.
-- **Current Version**: `1.2.1`.
+- **Current Version**: `1.2.2`.
 - **Last Stoppage Point**:
-  - **Live Target Section Visualization & Interactive Element Picker implemented**:
-    - Popup displays **Target Section Preview Card** showing the active target tag, dimensions, scrollability, and selector.
-    - Added `🎯 Pick on page` button enabling hover-to-inspect overlay on the webpage to click any element, container, modal, or feed.
-    - Added `👁️ Show` button and real-time live glow highlight on the target element whenever settings/presets change.
-  - **Header Captured Exactly Once (`headerMode: 'once'`) implemented**:
-    - Added `Header & sticky bars` dropdown in popup (`once` [Recommended], `hide`, `repeat`).
-    - Slice 0 captures with header intact (`sliceTopInset = 0`, no persistent bar hiding before slice 0).
-    - Slices 1+ hide repeating sticky headers and apply top inset so headers do not duplicate.
-  - Independent shape customization implemented and verified: Each circle and rectangle retains its own `shapeFill` and border thickness. The settings popover provides a target selector (`Circle #1`, `Circle #2`...) when multiple shapes exist.
-  - Interactive on-canvas text scaling implemented and verified with corner handles.
-  - Floating stroke preview bubble and tool settings modal repositioned to `#mainWorkspace` with `z-index: 1000` to prevent CSS clipping.
-  - Right-click capture tool panel (`popup.html`) and presets fully connected with `background.js` and `content.js`.
+  - **Capture Start Position Selection implemented**:
+    - Added `startPosition: 'top' | 'current'` setting option in `capture-settings.js`, `popup.html`, and `popup.js`.
+    - User can choose to capture from the top of the page down to bottom (full page) or start exactly from their current scroll position down to bottom.
+    - Slices and canvas stitching calculate from `startY` dynamically.
+  - **Capture In-Flight Controls (Pause / Stop & View / Cancel) implemented**:
+    - Added floating live progress widget `#fullshot-capture-progress-widget` on the webpage during capture.
+    - User can Pause/Resume, Stop early (taking captured slices to the editor immediately), or Cancel capture cleanly.
+    - Widget is temporarily hidden before each viewport snapshot and restored immediately after so it never appears in screenshots.
+  - **Accessible Settings Panel implemented**:
+    - Added `"default_popup": "popup.html"` to `manifest.json`: left-clicking extension icon opens the settings and capture panel instantly.
+    - Added global shortcut `Alt+Shift+S` to open the panel from any tab.
+    - Added webpage context menus (`contexts: ['page', 'action']`) for settings and capture.
+  - **Default Target Section Highlighting implemented**:
+    - Opening the panel now highlights the target section by default on the page so user immediately sees what will be captured.
+    - Pressing "Capture full page" or "Visible area" immediately hides the border before capture begins.
   - All unit/runtime tests passing (`node -c` clean, 0 syntax or runtime errors).
 
 ---
 
 ## 2. Recent Major Fixes & Enhancements
 
-### A. Live Target Section Identification & Element Picker (Latest Enhancement)
-- **Problem**: Modern web pages have multiple menus, sidebars, modals, and nested containers. Users could not tell which section would be captured.
+### A. Capture Start Position & In-Flight Controls (Latest)
+- **Problem**: Captures always scrolled to top; no way to stop/pause stuck captures; settings were hidden behind right-click menu; target border wasn't visible by default.
 - **Solution**:
-  - Enhanced `content.js` `analyzePageForCapture()` to return detailed metadata: `targetName`, `targetTag`, `targetDimensions`, `canScroll`, `scrollablePages`, and `targetSelector`.
-  - Implemented `highlightTargetSection()`: injects a glowing `#fullshot-target-highlighter` around the target container or viewport with a floating status pill.
-  - Implemented `startElementPicker()`: interactive hover-inspection mode with `#fullshot-picker-ui`. Clicking any container computes its CSS selector, saves it to `chrome.storage.local`, and highlights it.
-  - Added Target Section Preview Card in `popup.html` and bound live updates in `popup.js`.
+  - Added `startPosition` selection (`top` vs `current`).
+  - Added floating control widget with `⏸️ Pause`, `⏹️ Stop & View`, and `✕ Cancel` buttons.
+  - Connected action popup to `popup.html`, added `Alt+Shift+S` command, and registered page-level context menus.
+  - Marked target section by default on popup open without auto-fading, and clear it cleanly on capture start.
 
 ### B. Header Captured Once at the Top (`headerMode`) (Latest Enhancement)
 - **Problem**: Full-page screenshots either hid headers completely or duplicated them across every slice down the page.

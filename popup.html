@@ -11,7 +11,7 @@
       <img src="icons/icon-32.png" alt="" width="22" height="22">
       <div>
         <strong>Fullshot Pro</strong>
-        <span>Right-click the icon for this panel</span>
+        <span>Click icon, press Alt+Shift+S, or right-click page</span>
       </div>
     </div>
   </header>
@@ -69,6 +69,14 @@
       </div>
       <p class="target-selector-text" id="targetSelectorText" hidden></p>
     </div>
+
+    <label class="field" style="margin-top: 10px;">
+      <span>Capture start point</span>
+      <select id="startPosition">
+        <option value="top">From top of page to bottom (Full page)</option>
+        <option value="current">From current scroll position to bottom</option>
+      </select>
+    </label>
   </section>
 
   <section class="block">

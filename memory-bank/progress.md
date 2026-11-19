@@ -7,13 +7,15 @@
 | **Capture Engine** | Full-Page Auto Scroll-Stitch | ✅ Complete | Dynamic height check, settle delays |
 | **Capture Engine** | Capture Visible Area | ✅ Complete | Available via right-click context menu |
 | **Capture Engine** | Inner Container & Modal Scroll | ✅ Complete | Detects scrollable `<div>` / modal / selector |
+| **Capture Engine** | Capture Start Position | ✅ Complete | Top to bottom OR Current scroll position to bottom |
+| **Capture Engine** | In-Flight Pause, Stop & Cancel | ✅ Complete | Floating controls on page (`Pause`, `Stop & View`, `Cancel`) |
 | **Capture Engine** | Sticky Header Suppression | ✅ Complete | Suppressed on slices > 0, restored on completion |
 | **Capture Engine** | Header Capture Once (`headerMode`) | ✅ Complete | Capture header once at the top without repeating |
-| **Capture Engine** | Visual Target Highlighting | ✅ Complete | Real-time glowing frame and badge on target container |
+| **Capture Engine** | Default Target Marking & Preview | ✅ Complete | Border marks target section by default, hides on start |
 | **Capture Engine** | Interactive Section Picker | ✅ Complete | "Pick on page" hover-and-click container selector |
 | **Capture Engine** | Visual Deduplication & Backoff | ✅ Complete | Skips stuck frames using slice fingerprints |
 | **Capture Engine** | Badge Progress Feedback | ✅ Complete | Displays `0%` -> `100%` or `ERR` on icon |
-| **Tool Panel** | Right-Click Settings Modal | ✅ Complete | Dedicated `popup.html` window |
+| **Tool Panel** | Accessible Settings Panel | ✅ Complete | 1-click icon popup, Alt+Shift+S, webpage context menu |
 | **Tool Panel** | Layout Presets | ✅ Complete | Auto, Article, SPA, Modal, Sticky, Lazy |
 | **Tool Panel** | Capture Pace Sliders | ✅ Complete | Settle delay, start delay, bottom wait |
 | **Tool Panel** | Overlap & Max Slice Sliders | ✅ Complete | Adjustable slice overlap (0-55%) |

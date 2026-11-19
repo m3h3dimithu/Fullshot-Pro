@@ -2,7 +2,16 @@
 importScripts('capture-settings.js');
 
 const MENU_SETTINGS = 'fullshot_open_settings';
+const MENU_FULLPAGE = 'fullshot_capture_fullpage';
 const MENU_VISIBLE = 'fullshot_capture_visible';
+
+let currentCaptureControl = {
+  tabId: null,
+  isPaused: false,
+  isStopped: false,
+  isCancelled: false,
+  resumeResolve: null
+};
 
 function isRestrictedTabUrl(tabUrl) {
   return (
@@ -33,13 +42,18 @@ function createActionMenus() {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: MENU_SETTINGS,
-      title: 'Capture settings…',
-      contexts: ['action']
+      title: 'Fullshot Pro: Capture settings & panel…',
+      contexts: ['action', 'page']
+    });
+    chrome.contextMenus.create({
+      id: MENU_FULLPAGE,
+      title: 'Fullshot Pro: Capture full page',
+      contexts: ['action', 'page']
     });
     chrome.contextMenus.create({
       id: MENU_VISIBLE,
-      title: 'Capture visible area',
-      contexts: ['action']
+      title: 'Fullshot Pro: Capture visible area',
+      contexts: ['action', 'page']
     });
   });
 }
@@ -74,8 +88,8 @@ async function openCaptureSettings() {
   await chrome.windows.create({
     url: settingsUrl,
     type: 'popup',
-    width: 420,
-    height: 680,
+    width: 440,
+    height: 700,
     focused: true
   });
 }
@@ -93,12 +107,16 @@ async function beginCaptureForTab(tab, captureType) {
 }
 
 chrome.action.onClicked.addListener((tab) => {
-  beginCaptureForTab(tab, 'fullpage');
+  openCaptureSettings();
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === MENU_SETTINGS) {
     openCaptureSettings();
+    return;
+  }
+  if (info.menuItemId === MENU_FULLPAGE) {
+    beginCaptureForTab(tab, 'fullpage');
     return;
   }
   if (info.menuItemId === MENU_VISIBLE) {
@@ -107,21 +125,57 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action !== 'capture_full_page') return;
-
-  (async () => {
-    let tab = null;
-    if (request.tabId) {
-      tab = await getFreshTab(request.tabId);
+  if (request.action === 'stop_capture') {
+    currentCaptureControl.isStopped = true;
+    if (currentCaptureControl.resumeResolve) {
+      currentCaptureControl.resumeResolve();
+      currentCaptureControl.resumeResolve = null;
     }
-    if (!tab || isRestrictedTabUrl((tab.url || ''))) {
-      tab = await getActiveWebpageTab();
-    }
-    await beginCaptureForTab(tab, request.captureType);
-  })();
+    sendResponse({ ok: true });
+    return true;
+  }
 
-  sendResponse({ ok: true });
-  return true;
+  if (request.action === 'cancel_capture') {
+    currentCaptureControl.isCancelled = true;
+    if (currentCaptureControl.resumeResolve) {
+      currentCaptureControl.resumeResolve();
+      currentCaptureControl.resumeResolve = null;
+    }
+    sendResponse({ ok: true });
+    return true;
+  }
+
+  if (request.action === 'pause_capture') {
+    currentCaptureControl.isPaused = true;
+    sendResponse({ ok: true });
+    return true;
+  }
+
+  if (request.action === 'resume_capture') {
+    currentCaptureControl.isPaused = false;
+    if (currentCaptureControl.resumeResolve) {
+      currentCaptureControl.resumeResolve();
+      currentCaptureControl.resumeResolve = null;
+    }
+    sendResponse({ ok: true });
+    return true;
+  }
+
+  if (request.action === 'capture_full_page') {
+    (async () => {
+      let tab = null;
+      if (request.tabId) {
+        tab = await getFreshTab(request.tabId);
+      }
+      if (!tab || isRestrictedTabUrl((tab.url || ''))) {
+        tab = await getActiveWebpageTab();
+      }
+      await beginCaptureForTab(tab, request.captureType);
+    })();
+
+    sendResponse({ ok: true });
+    return true;
+  }
 });
 
 // Helper to send message with retry
@@ -358,6 +412,14 @@ async function captureFullPage(tab, captureTypeOverride) {
       return;
     }
     
+    currentCaptureControl = {
+      tabId: tab.id,
+      isPaused: false,
+      isStopped: false,
+      isCancelled: false,
+      resumeResolve: null
+    };
+
     let { totalHeight, viewportHeight } = response;
     const topInset = Math.max(0, response.captureTopInset || 0);
     const bottomInset = Math.max(0, response.captureBottomInset || 0);
@@ -365,11 +427,17 @@ async function captureFullPage(tab, captureTypeOverride) {
     const overlapRatio = Math.min(0.6, Math.max(0, settings.overlapPercent / 100));
     const stepHeight = Math.max(80, Math.round(effectiveHeight * (1 - overlapRatio)));
     const maxSlices = settings.captureType === 'visible' ? 1 : settings.maxSlices;
+
+    const startY = (settings.startPosition === 'current' && Number.isFinite(response.originalScrollTop))
+      ? Math.max(0, Math.min(Math.round(Number(response.originalScrollTop)), Math.max(0, totalHeight - viewportHeight)))
+      : 0;
+
+    const captureRange = Math.max(viewportHeight, totalHeight - startY);
     let totalPages = Math.min(
       maxSlices,
-      totalHeight <= viewportHeight || settings.captureType === 'visible'
+      captureRange <= viewportHeight || settings.captureType === 'visible'
         ? 1
-        : Math.ceil((totalHeight - viewportHeight) / stepHeight) + 1
+        : Math.ceil((captureRange - viewportHeight) / stepHeight) + 1
     );
     let capturedChunks = [];
     let lastCapturedScrollY = null;
@@ -378,10 +446,32 @@ async function captureFullPage(tab, captureTypeOverride) {
     const winId = tab.windowId || null;
 
     for (let i = 0; i < totalPages; i++) {
+      if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
+        break;
+      }
+      while (currentCaptureControl.isPaused && !currentCaptureControl.isCancelled && !currentCaptureControl.isStopped) {
+        await new Promise((r) => {
+          currentCaptureControl.resumeResolve = r;
+          setTimeout(r, 200);
+        });
+      }
+      if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
+        break;
+      }
+
       const pct = Math.round(((i + 1) / totalPages) * 100);
       chrome.action.setBadgeText({ text: pct + "%" });
 
-      const targetY = Math.min(i * stepHeight, Math.max(0, totalHeight - viewportHeight));
+      // Update progress overlay on webpage
+      await sendMessageWithRetry(tab.id, {
+        action: "update_capture_overlay",
+        currentSlice: i + 1,
+        totalSlices: totalPages,
+        pct,
+        isPaused: currentCaptureControl.isPaused
+      });
+
+      const targetY = Math.min(startY + i * stepHeight, Math.max(0, totalHeight - viewportHeight));
 
       // Scroll to specific page slice
       const scrollRes = await sendMessageWithRetry(tab.id, { 
@@ -401,19 +491,23 @@ async function captureFullPage(tab, captureTypeOverride) {
         totalHeight = Math.max(viewportHeight, scrollRes.totalHeight);
       } else if (Number.isFinite(scrollRes.totalHeight) && scrollRes.totalHeight > totalHeight) {
         totalHeight = scrollRes.totalHeight;
+        const newRange = Math.max(viewportHeight, totalHeight - startY);
         totalPages = Math.min(
           maxSlices,
           Math.max(
             totalPages,
-            totalHeight <= viewportHeight
+            newRange <= viewportHeight
               ? 1
-              : Math.ceil((totalHeight - viewportHeight) / stepHeight) + 1
+              : Math.ceil((newRange - viewportHeight) / stepHeight) + 1
           )
         );
       }
       const atLastSlice = i === totalPages - 1 || targetY >= totalHeight - viewportHeight;
       await sleep(settings.settleDelayMs + (atLastSlice ? settings.bottomWaitMs : 0));
       
+      // Temporarily hide progress widget during snapshot so it never appears in the captured image
+      await sendMessageWithRetry(tab.id, { action: "hide_capture_overlay" });
+
       // Capture visual viewport chunk with backoff retry
       let dataUrl = null;
       const maxRetries = 4;
@@ -430,6 +524,15 @@ async function captureFullPage(tab, captureTypeOverride) {
           await new Promise(r => setTimeout(r, 400));
         }
       }
+
+      // Show progress overlay again after frame is captured
+      await sendMessageWithRetry(tab.id, {
+        action: "update_capture_overlay",
+        currentSlice: i + 1,
+        totalSlices: totalPages,
+        pct,
+        isPaused: currentCaptureControl.isPaused
+      });
       
       if (dataUrl) {
         let actualScrollY = scrollRes.actualScrollY;
@@ -437,8 +540,6 @@ async function captureFullPage(tab, captureTypeOverride) {
         const duplicateScroll = settings.skipDuplicateFrames && lastCapturedScrollY !== null &&
           Math.abs(normalizedScrollY - lastCapturedScrollY) <= 2;
 
-        // Never add the same viewport twice. This is common on pages whose
-        // scroll handler is still rendering when captureVisibleTab runs.
         if (duplicateScroll) {
           await sleep(Math.max(200, Math.round(settings.settleDelayMs / 2)));
           const retryScroll = await sendMessageWithRetry(tab.id, {
@@ -464,9 +565,6 @@ async function captureFullPage(tab, captureTypeOverride) {
           }
         }
 
-        // Some pages report a changed scroll position before their compositor
-        // has painted the new viewport. Do not stitch an identical frame as a
-        // new slice; give the page another scroll/render/capture opportunity.
         let captureFingerprint = getCaptureFingerprint(dataUrl);
         if (settings.skipDuplicateFrames && lastCaptureFingerprint && captureFingerprint === lastCaptureFingerprint) {
           await sleep(Math.max(300, settings.settleDelayMs));
@@ -494,7 +592,7 @@ async function captureFullPage(tab, captureTypeOverride) {
           break;
         }
 
-        const sliceTopInset = (i === 0 && (settings.headerMode === 'once' || settings.headerMode === 'repeat'))
+        const sliceTopInset = (i === 0 && startY === 0 && (settings.headerMode === 'once' || settings.headerMode === 'repeat'))
           ? 0
           : topInset;
         const cropRect = response.targetRect || (
@@ -530,11 +628,20 @@ async function captureFullPage(tab, captureTypeOverride) {
       }
     }
 
+    // Remove floating progress overlay
+    await sendMessageWithRetry(tab.id, { action: "remove_capture_overlay" });
+
     // Restore original scroll position and elements
     await sendMessageWithRetry(tab.id, { action: "restore_scroll", settings });
 
     // Clear badge
     chrome.action.setBadgeText({ text: "" });
+
+    if (currentCaptureControl.isCancelled) {
+      console.log("Capture cancelled by user.");
+      return;
+    }
+
     response.totalHeight = totalHeight;
     response.totalPages = capturedChunks.length;
 
