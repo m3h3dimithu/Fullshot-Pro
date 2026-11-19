@@ -8,10 +8,12 @@
     - Added `startPosition: 'top' | 'current'` setting option in `capture-settings.js`, `popup.html`, and `popup.js`.
     - User can choose to capture from the top of the page down to bottom (full page) or start exactly from their current scroll position down to bottom.
     - Slices and canvas stitching calculate from `startY` dynamically.
-  - **Capture In-Flight Controls (Pause / Stop & View / Cancel) implemented**:
-    - Added floating live progress widget `#fullshot-capture-progress-widget` on the webpage during capture.
-    - User can Pause/Resume, Stop early (taking captured slices to the editor immediately), or Cancel capture cleanly.
-    - Widget is temporarily hidden before each viewport snapshot and restored immediately after so it never appears in screenshots.
+  - **Capture In-Flight Floating Dock (`#fullshot-capture-dock`) implemented**:
+    - Embedded directly in webpage DOM with high z-index (`2147483647`) so it never minimizes to taskbar or hides behind browser.
+    - Zero in-page screenshot pollution: before each viewport capture, `prepare_for_snapshot` sets `display: none` and waits for double `requestAnimationFrame`s, ensuring Chromium's compositor paints a clean screen before `captureVisibleTabPng`.
+    - Instant responsiveness via `interruptibleSleep` in `background.js` (polling every 40-50ms): `Pause/Resume`, `Stop & View`, and `Cancel` respond instantaneously without waiting for long sleep timers.
+    - Features manual minimize/expand toggle button (`−` / `⛶`): user can collapse to a tiny pill or expand anytime.
+    - Kbd shortcuts: Space to Pause/Resume, Enter to Stop & View, Esc to Cancel.
   - **Accessible Settings Panel implemented**:
     - Added `"default_popup": "popup.html"` to `manifest.json`: left-clicking extension icon opens the settings and capture panel instantly.
     - Added global shortcut `Alt+Shift+S` to open the panel from any tab.

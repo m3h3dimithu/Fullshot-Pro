@@ -344,35 +344,12 @@ async function captureFullPage(tab, captureTypeOverride) {
     }
   };
 
-  let controllerWindowId = null;
   const broadcastProgress = (info) => {
     chrome.runtime.sendMessage({
       action: 'capture_progress',
       ...info
     }).catch(() => {});
   };
-
-  const closeControllerWindow = async () => {
-    if (controllerWindowId) {
-      const id = controllerWindowId;
-      controllerWindowId = null;
-      try {
-        await chrome.windows.remove(id);
-      } catch (e) {}
-    }
-  };
-
-  const windowRemoveListener = (removedWinId) => {
-    if (removedWinId === controllerWindowId) {
-      controllerWindowId = null;
-      currentCaptureControl.isCancelled = true;
-      if (currentCaptureControl.resumeResolve) {
-        currentCaptureControl.resumeResolve();
-        currentCaptureControl.resumeResolve = null;
-      }
-    }
-  };
-  chrome.windows.onRemoved.addListener(windowRemoveListener);
 
   try {
     // Ensure tab is active and window focused for captureVisibleTab
@@ -471,24 +448,14 @@ async function captureFullPage(tab, captureTypeOverride) {
       return;
     }
 
-    // Launch floating capture controller window outside the webpage
-    try {
-      const parentWin = await chrome.windows.get(tab.windowId || chrome.windows.WINDOW_ID_CURRENT).catch(() => null);
-      const left = parentWin ? Math.max(10, (parentWin.left || 0) + (parentWin.width || 1200) - 400) : 100;
-      const top = parentWin ? Math.max(10, (parentWin.top || 0) + 35) : 35;
-      const ctrlWin = await chrome.windows.create({
-        url: chrome.runtime.getURL('capture-controller.html'),
-        type: 'popup',
-        width: 380,
-        height: 165,
-        left,
-        top,
-        focused: false
-      });
-      controllerWindowId = ctrlWin ? ctrlWin.id : null;
-    } catch (e) {
-      console.warn('Could not create controller window:', e);
-    }
+    // Initialize in-page capture dock
+    await sendMessageWithRetry(tab.id, {
+      action: "init_capture_dock",
+      currentSlice: 1,
+      totalSlices: 1,
+      pct: 0,
+      isPaused: false
+    });
 
     let { totalHeight, viewportHeight } = response;
     const topInset = Math.max(0, response.captureTopInset || 0);
@@ -544,6 +511,13 @@ async function captureFullPage(tab, captureTypeOverride) {
         pct,
         isPaused: currentCaptureControl.isPaused
       });
+      await sendMessageWithRetry(tab.id, {
+        action: "show_capture_dock",
+        currentSlice: i + 1,
+        totalSlices: totalPages,
+        pct,
+        isPaused: currentCaptureControl.isPaused
+      });
 
       const targetY = Math.min(startY + i * stepHeight, Math.max(0, totalHeight - viewportHeight));
 
@@ -582,6 +556,9 @@ async function captureFullPage(tab, captureTypeOverride) {
       if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
         break;
       }
+
+      // Hide dock and wait for clean compositor repaint before capturing
+      await sendMessageWithRetry(tab.id, { action: "prepare_for_snapshot" });
 
       // Capture visual viewport chunk with backoff retry
       let dataUrl = null;
@@ -755,7 +732,6 @@ async function captureFullPage(tab, captureTypeOverride) {
       });
     } catch (e) {}
   } finally {
-    chrome.windows.onRemoved.removeListener(windowRemoveListener);
-    await closeControllerWindow();
+    await sendMessageWithRetry(tab.id, { action: "remove_capture_dock" });
   }
 }

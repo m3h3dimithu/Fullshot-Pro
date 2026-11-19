@@ -428,6 +428,257 @@ function highlightTargetSection(settings, autoFade = false) {
   return analysis;
 }
 
+let _captureDockState = {
+  isMinimized: false,
+  isPaused: false,
+  isStopping: false
+};
+
+function createOrGetCaptureDock() {
+  let dock = document.getElementById('fullshot-capture-dock');
+  if (dock) return dock;
+
+  dock = document.createElement('div');
+  dock.id = 'fullshot-capture-dock';
+  dock.style.cssText = `
+    position: fixed !important;
+    top: 24px !important;
+    right: 24px !important;
+    z-index: 2147483647 !important;
+    background: #0f172a !important;
+    color: #f8fafc !important;
+    border: 1.5px solid #6366f1 !important;
+    border-radius: 12px !important;
+    padding: 8px 14px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 15px rgba(99, 102, 241, 0.25) !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    font: 600 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    user-select: none !important;
+    cursor: default !important;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease !important;
+  `;
+
+  let isDragging = false;
+  let dragStartX = 0, dragStartY = 0;
+  let initialLeft = 0, initialTop = 0;
+
+  dock.addEventListener('mousedown', (e) => {
+    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+    isDragging = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    const rect = dock.getBoundingClientRect();
+    initialLeft = rect.left;
+    initialTop = rect.top;
+    dock.style.cursor = 'grabbing';
+  });
+
+  const onMouseMove = (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    dock.style.right = 'auto';
+    dock.style.bottom = 'auto';
+    const newLeft = Math.max(10, Math.min(window.innerWidth - dock.offsetWidth - 10, initialLeft + dx));
+    const newTop = Math.max(10, Math.min(window.innerHeight - dock.offsetHeight - 10, initialTop + dy));
+    dock.style.left = `${newLeft}px`;
+    dock.style.top = `${newTop}px`;
+  };
+
+  const onMouseUp = () => {
+    if (isDragging) {
+      isDragging = false;
+      dock.style.cursor = 'default';
+    }
+  };
+
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
+  window._fullshotDockDragCleanup = () => {
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  };
+
+  if (!window._fullshotDockKeyHandler) {
+    window._fullshotDockKeyHandler = (e) => {
+      const d = document.getElementById('fullshot-capture-dock');
+      if (!d || d.style.display === 'none') return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        const pBtn = d.querySelector('#fullshot-dock-btn-pause');
+        if (pBtn) pBtn.click();
+      } else if (e.code === 'Enter') {
+        e.preventDefault();
+        const sBtn = d.querySelector('#fullshot-dock-btn-stop');
+        if (sBtn) sBtn.click();
+      } else if (e.code === 'Escape') {
+        e.preventDefault();
+        const cBtn = d.querySelector('#fullshot-dock-btn-cancel');
+        if (cBtn) cBtn.click();
+      }
+    };
+    window.addEventListener('keydown', window._fullshotDockKeyHandler, true);
+  }
+
+  (document.body || document.documentElement).appendChild(dock);
+  return dock;
+}
+
+function updateCaptureDockUI(data) {
+  const dock = createOrGetCaptureDock();
+  if (!dock) return;
+
+  if (data && typeof data.isPaused === 'boolean') {
+    _captureDockState.isPaused = data.isPaused;
+  }
+  const isPaused = _captureDockState.isPaused;
+  const isMinimized = _captureDockState.isMinimized;
+  const isStopping = _captureDockState.isStopping;
+
+  const currentSlice = data.currentSlice || 1;
+  const totalSlices = data.totalSlices || 1;
+  const pct = Math.max(0, Math.min(100, data.pct || 0));
+
+  let statusLabel = isStopping
+    ? '⏹️ Stopping…'
+    : isPaused
+      ? `⏸️ Paused (${pct}%)`
+      : `📸 Slice ${currentSlice}/${totalSlices} (${pct}%)`;
+
+  if (isMinimized) {
+    dock.style.borderRadius = '999px';
+    dock.style.padding = '6px 12px';
+    dock.innerHTML = `
+      <span style="color: ${isPaused ? '#fbbf24' : '#a5b4fc'}; font-size: 12px; font-weight: 700; cursor: move;">
+        ${isPaused ? '⏸️' : '📸'} ${pct}%
+      </span>
+      <button id="fullshot-dock-btn-pause" type="button" style="background: ${isPaused ? '#4338ca' : '#1e1b4b'}; color: #c7d2fe; border: 1px solid #4f46e5; border-radius: 999px; padding: 3px 8px; font-size: 11px; font-weight: 600; cursor: pointer;" title="${isPaused ? 'Resume capture [Space]' : 'Pause capture [Space]'}">
+        ${isPaused ? '▶️' : '⏸️'}
+      </button>
+      <button id="fullshot-dock-btn-stop" type="button" style="background: #059669; color: #ffffff; border: none; border-radius: 999px; padding: 3px 8px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Stop and open editor [Enter]">
+        ⏹️
+      </button>
+      <button id="fullshot-dock-btn-min" type="button" style="background: transparent; color: #94a3b8; border: none; font-size: 13px; font-weight: 700; cursor: pointer; padding: 2px 4px;" title="Expand controls">
+        ⛶
+      </button>
+    `;
+  } else {
+    dock.style.borderRadius = '12px';
+    dock.style.padding = '8px 14px';
+    dock.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px; cursor: move;">
+        <span style="color: ${isPaused ? '#fbbf24' : '#e0e7ff'}; font-size: 12px; font-weight: 700; white-space: nowrap;">
+          ${statusLabel}
+        </span>
+        <div style="width: 44px; height: 5px; background: #1e293b; border-radius: 999px; overflow: hidden; border: 1px solid #334155;">
+          <div style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #4f46e5, #818cf8); border-radius: 999px; transition: width 0.2s;"></div>
+        </div>
+      </div>
+      <button id="fullshot-dock-btn-pause" type="button" style="background: ${isPaused ? '#4338ca' : '#1e1b4b'}; color: #c7d2fe; border: 1px solid #4f46e5; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;" title="Pause / Resume [Space]">
+        ${isPaused ? '▶️ Resume' : '⏸️ Pause'}
+      </button>
+      <button id="fullshot-dock-btn-stop" type="button" style="background: #059669; color: #ffffff; border: none; border-radius: 6px; padding: 5px 11px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;" title="Finish and view screenshot [Enter]">
+        ⏹️ Stop & View
+      </button>
+      <button id="fullshot-dock-btn-cancel" type="button" style="background: #dc2626; color: #ffffff; border: none; border-radius: 6px; padding: 5px 9px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;" title="Cancel capture [Esc]">
+        ✕ Cancel
+      </button>
+      <button id="fullshot-dock-btn-min" type="button" style="background: transparent; color: #64748b; border: none; font-size: 14px; font-weight: 700; cursor: pointer; padding: 2px 4px; line-height: 1;" title="Minimize dock">
+        −
+      </button>
+    `;
+  }
+
+  const pauseBtn = dock.querySelector('#fullshot-dock-btn-pause');
+  const stopBtn = dock.querySelector('#fullshot-dock-btn-stop');
+  const cancelBtn = dock.querySelector('#fullshot-dock-btn-cancel');
+  const minBtn = dock.querySelector('#fullshot-dock-btn-min');
+
+  if (pauseBtn) {
+    pauseBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (_captureDockState.isStopping) return;
+      const nextPaused = !_captureDockState.isPaused;
+      _captureDockState.isPaused = nextPaused;
+      updateCaptureDockUI({ ...data, isPaused: nextPaused });
+      chrome.runtime.sendMessage({ action: nextPaused ? 'pause_capture' : 'resume_capture' });
+    };
+  }
+
+  if (stopBtn) {
+    stopBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (_captureDockState.isStopping) return;
+      _captureDockState.isStopping = true;
+      stopBtn.disabled = true;
+      stopBtn.style.opacity = '0.6';
+      stopBtn.textContent = '⏹️ Stopping…';
+      chrome.runtime.sendMessage({ action: 'stop_capture' });
+    };
+  }
+
+  if (cancelBtn) {
+    cancelBtn.onclick = (e) => {
+      e.stopPropagation();
+      cancelBtn.disabled = true;
+      cancelBtn.textContent = '✕ Cancelling…';
+      chrome.runtime.sendMessage({ action: 'cancel_capture' });
+    };
+  }
+
+  if (minBtn) {
+    minBtn.onclick = (e) => {
+      e.stopPropagation();
+      _captureDockState.isMinimized = !_captureDockState.isMinimized;
+      updateCaptureDockUI(data);
+    };
+  }
+}
+
+function prepareForSnapshot() {
+  const dock = document.getElementById('fullshot-capture-dock');
+  if (dock) {
+    dock.style.setProperty('display', 'none', 'important');
+  }
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        resolve();
+      });
+    });
+  });
+}
+
+function showCaptureDock(data) {
+  const dock = createOrGetCaptureDock();
+  if (dock) {
+    dock.style.removeProperty('display');
+  }
+  updateCaptureDockUI(data);
+}
+
+function removeCaptureDock() {
+  const dock = document.getElementById('fullshot-capture-dock');
+  if (dock) {
+    dock.remove();
+  }
+  _captureDockState = {
+    isMinimized: false,
+    isPaused: false,
+    isStopping: false
+  };
+  if (window._fullshotDockKeyHandler) {
+    window.removeEventListener('keydown', window._fullshotDockKeyHandler, true);
+    window._fullshotDockKeyHandler = null;
+  }
+  if (window._fullshotDockDragCleanup) {
+    window._fullshotDockDragCleanup();
+    window._fullshotDockDragCleanup = null;
+  }
+}
+
 
 function showToast(text) {
   const toast = document.createElement('div');
@@ -651,6 +902,31 @@ window.screenCaptureListener = (request, sender, sendResponse) => {
   }
 
 
+  if (request.action === "init_capture_dock") {
+    showCaptureDock(request);
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === "prepare_for_snapshot") {
+    prepareForSnapshot().then(() => {
+      sendResponse({ ready: true });
+    });
+    return true;
+  }
+
+  if (request.action === "show_capture_dock") {
+    showCaptureDock(request);
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === "remove_capture_dock") {
+    removeCaptureDock();
+    sendResponse({ success: true });
+    return true;
+  }
+
   if (request.action === "start_element_picker") {
     startElementPicker();
     sendResponse({ started: true });
@@ -859,6 +1135,7 @@ window.screenCaptureListener = (request, sender, sendResponse) => {
   }
 
   if (request.action === "restore_scroll") {
+    removeCaptureDock();
     clearHighlightAndPicker();
     const isWindow = window.captureIsWindowScroll !== false;
     const targetEl = window.captureScrollTarget;
