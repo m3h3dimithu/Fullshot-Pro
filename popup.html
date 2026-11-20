@@ -11,22 +11,22 @@
       <img src="icons/icon-32.png" alt="" width="22" height="22">
       <div>
         <strong>Fullshot Pro</strong>
-        <span>Click icon, press Alt+Shift+S, or right-click page</span>
+        <span>Alt+Shift+S or right-click</span>
       </div>
     </div>
+    <button id="startCaptureBtn" class="btn-header-start" type="button" title="Start capture now">
+      <span>📸</span>
+      <span>Start</span>
+    </button>
   </header>
 
   <div class="start-point-bar">
-    <span class="start-point-label">Start point:</span>
+    <span class="start-point-label">Mode:</span>
     <div class="chip-row start-chips" id="startPointChips">
       <button type="button" data-start="top" class="start-chip active" title="Scrolls to top of page and captures down to bottom">⬆️ Page top</button>
       <button type="button" data-start="current" class="start-chip" title="Captures from current scroll position down to bottom">⬇️ Current position</button>
+      <button type="button" data-start="visible" class="start-chip" title="Captures only the currently visible screen">👁️ Visible area</button>
     </div>
-  </div>
-
-  <div class="actions">
-    <button id="captureFull" class="btn-primary" type="button">Capture full page</button>
-    <button id="captureVisible" class="btn-secondary" type="button">Visible area</button>
   </div>
 
   <p id="pageHint" class="page-hint">Checking this tab…</p>

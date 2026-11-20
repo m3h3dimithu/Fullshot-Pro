@@ -51,13 +51,23 @@ function renderSettings() {
   $('scrollTarget').value = settings.scrollTarget;
   $('selector').value = settings.selector;
   $('selectorField').hidden = settings.scrollTarget !== 'selector';
-  const startPos = settings.startPosition || 'top';
+  const currentMode = settings.captureType === 'visible'
+    ? 'visible'
+    : (settings.startPosition || 'top');
   if ($('startPosition')) {
-    $('startPosition').value = startPos;
+    $('startPosition').value = settings.startPosition || 'top';
   }
-  setChipActive('startPointChips', 'data-start', startPos);
+  setChipActive('startPointChips', 'data-start', currentMode);
+  if ($('startCaptureBtn')) {
+    const labelSpan = $('startCaptureBtn').querySelector('span:last-child');
+    if (labelSpan) {
+      labelSpan.textContent = currentMode === 'visible'
+        ? 'Capture'
+        : 'Start';
+    }
+  }
   if ($('captureFull')) {
-    $('captureFull').textContent = startPos === 'current'
+    $('captureFull').textContent = currentMode === 'current'
       ? '📸 Capture from here to bottom'
       : '📸 Capture full page';
   }
@@ -192,13 +202,18 @@ function bindControls() {
   }
   document.querySelectorAll('#startPointChips button').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const val = btn.getAttribute('data-start') || 'top';
-      settings.startPosition = val;
-      if ($('startPosition')) {
-        $('startPosition').value = val;
+      const mode = btn.getAttribute('data-start') || 'top';
+      if (mode === 'visible') {
+        settings.captureType = 'visible';
+      } else {
+        settings.captureType = 'fullpage';
+        settings.startPosition = mode;
+        if ($('startPosition')) {
+          $('startPosition').value = mode;
+        }
       }
-      setChipActive('startPointChips', 'data-start', val);
-      queueSave(true);
+      setChipActive('startPointChips', 'data-start', mode);
+      queueSave(false);
     });
   });
   ['settleDelayMs', 'startDelayMs', 'bottomWaitMs', 'overlapPercent', 'maxSlices', 'scrollRetries'].forEach((id) => {
@@ -286,8 +301,18 @@ function bindControls() {
     queueSave(true);
   });
 
-  $('captureFull').addEventListener('click', () => startCapture('fullpage'));
-  $('captureVisible').addEventListener('click', () => startCapture('visible'));
+  if ($('startCaptureBtn')) {
+    $('startCaptureBtn').addEventListener('click', () => {
+      const mode = settings.captureType === 'visible' ? 'visible' : 'fullpage';
+      startCapture(mode);
+    });
+  }
+  if ($('captureFull')) {
+    $('captureFull').addEventListener('click', () => startCapture('fullpage'));
+  }
+  if ($('captureVisible')) {
+    $('captureVisible').addEventListener('click', () => startCapture('visible'));
+  }
 }
 
 function showStatus(message) {
