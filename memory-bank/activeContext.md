@@ -10,6 +10,10 @@
     - Cleaned up top `START POINT:` bar to only feature two 1-click chips: `⬆️ Page top` and `⬇️ Current position` (removed `Visible area` per user request).
     - Removed the duplicate bottom `Capture start point` dropdown from the `Page setup` section.
     - Clicking `📸 Start` immediately triggers capture in the chosen start mode.
+  - **Custom User Icons Replaced**:
+    - Retrieved user's custom-designed icons from `C:\Users\Pc\Downloads\Archives\fullshot-extension\icons`.
+    - Updated `icons/icon-16.png`, `icons/icon-48.png`, and `icons/icon-128.png`.
+    - Generated matched high-quality bicubic 32x32 `icons/icon-32.png` for popup header and extension toolbar.
   - **In-Flight Standby Capture Dock (`#fullshot-capture-dock`) Zero-Blink & Immediate Restoration**:
     - Embedded directly in webpage DOM with high z-index (`2147483647`) so it stays standby, always on top, and never minimizes to taskbar or hides behind browser.
     - Zero in-page screenshot pollution: before each viewport capture, `takeCleanSnapshot` in `background.js` triggers `prepare_for_snapshot` which applies `visibility: hidden`, `opacity: 0`, and `pointer-events: none` with double `requestAnimationFrame`s, ensuring Chromium's compositor paints a clean screen before `captureVisibleTabPng`.
