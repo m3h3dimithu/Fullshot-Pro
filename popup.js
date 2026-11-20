@@ -51,8 +51,15 @@ function renderSettings() {
   $('scrollTarget').value = settings.scrollTarget;
   $('selector').value = settings.selector;
   $('selectorField').hidden = settings.scrollTarget !== 'selector';
+  const startPos = settings.startPosition || 'top';
   if ($('startPosition')) {
-    $('startPosition').value = settings.startPosition || 'top';
+    $('startPosition').value = startPos;
+  }
+  setChipActive('startPointChips', 'data-start', startPos);
+  if ($('captureFull')) {
+    $('captureFull').textContent = startPos === 'current'
+      ? '📸 Capture from here to bottom'
+      : '📸 Capture full page';
   }
   $('settleDelayMs').value = settings.settleDelayMs;
   $('startDelayMs').value = settings.startDelayMs;
@@ -179,9 +186,21 @@ function bindControls() {
   if ($('startPosition')) {
     $('startPosition').addEventListener('change', (e) => {
       settings.startPosition = e.target.value;
+      setChipActive('startPointChips', 'data-start', settings.startPosition);
       queueSave(true);
     });
   }
+  document.querySelectorAll('#startPointChips button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const val = btn.getAttribute('data-start') || 'top';
+      settings.startPosition = val;
+      if ($('startPosition')) {
+        $('startPosition').value = val;
+      }
+      setChipActive('startPointChips', 'data-start', val);
+      queueSave(true);
+    });
+  });
   ['settleDelayMs', 'startDelayMs', 'bottomWaitMs', 'overlapPercent', 'maxSlices', 'scrollRetries'].forEach((id) => {
     $(id).addEventListener('input', (e) => {
       settings[id] = Number(e.target.value);

@@ -16,6 +16,14 @@
     </div>
   </header>
 
+  <div class="start-point-bar">
+    <span class="start-point-label">Start point:</span>
+    <div class="chip-row start-chips" id="startPointChips">
+      <button type="button" data-start="top" class="start-chip active" title="Scrolls to top of page and captures down to bottom">⬆️ Page top</button>
+      <button type="button" data-start="current" class="start-chip" title="Captures from current scroll position down to bottom">⬇️ Current position</button>
+    </div>
+  </div>
+
   <div class="actions">
     <button id="captureFull" class="btn-primary" type="button">Capture full page</button>
     <button id="captureVisible" class="btn-secondary" type="button">Visible area</button>
