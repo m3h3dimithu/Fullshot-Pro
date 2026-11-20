@@ -7,8 +7,8 @@
 | **Capture Engine** | Full-Page Auto Scroll-Stitch | ✅ Complete | Dynamic height check, settle delays |
 | **Capture Engine** | Capture Visible Area | ✅ Complete | Available via right-click context menu |
 | **Capture Engine** | Inner Container & Modal Scroll | ✅ Complete | Detects scrollable `<div>` / modal / selector |
-| **Capture Engine** | Capture Start Position | ✅ Complete | Top to bottom OR Current scroll position to bottom |
-| **Capture Engine** | In-Flight Pause, Stop & Cancel | ✅ Complete | Floating controls on page (`Pause`, `Stop & View`, `Cancel`) |
+| **Capture Engine** | Capture Start Position | ✅ Complete | Top to bottom OR Current scroll position via 1-click top chips |
+| **Capture Engine** | In-Flight Pause, Stop & Cancel | ✅ Complete | In-page non-minimizing dock (`#fullshot-capture-dock`) with double-rAF snapshot hiding & instant response |
 | **Capture Engine** | Sticky Header Suppression | ✅ Complete | Suppressed on slices > 0, restored on completion |
 | **Capture Engine** | Header Capture Once (`headerMode`) | ✅ Complete | Capture header once at the top without repeating |
 | **Capture Engine** | Default Target Marking & Preview | ✅ Complete | Border marks target section by default, hides on start |
@@ -45,6 +45,7 @@
 - [x] Full crop undo/redo bitmap snapshot restoration verified.
 - [x] Target section highlight & element picker unit & integration test (`test_header_and_picker.js` - Passed).
 - [x] Header once (`headerMode: 'once'`) slice 0 vs slice 1+ inset logic test (`test_header_and_picker.js` - Passed).
+- [x] In-page capture dock, double-rAF snapshot hiding, top chips, and header start button test (`test_new_features.js` - Passed).
 - [x] User manual testing & acceptance: Confirmed working smoothly ("working good").
 
 ---

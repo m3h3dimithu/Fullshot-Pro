@@ -4,11 +4,12 @@
 - **Status**: Production-ready, fully functional Chrome MV3 extension.
 - **Current Version**: `1.2.2`.
 - **Last Stoppage Point**:
-  - **Streamlined Header Start Button & Capture Mode Selection**:
+  - **Streamlined Header Start Button & Single Start Point Control**:
     - Removed redundant dual `Capture full page` and `Visible area` buttons.
     - Added high-contrast primary `📸 Start` button directly in the top header right space beside "Fullshot Pro".
-    - Added 3 instant 1-click mode chips (`⬆️ Page top`, `⬇️ Current position`, `👁️ Visible area`) in the top bar.
-    - Clicking `📸 Start` immediately triggers capture in the selected mode.
+    - Cleaned up top `START POINT:` bar to only feature two 1-click chips: `⬆️ Page top` and `⬇️ Current position` (removed `Visible area` per user request).
+    - Removed the duplicate bottom `Capture start point` dropdown from the `Page setup` section.
+    - Clicking `📸 Start` immediately triggers capture in the chosen start mode.
   - **Capture In-Flight Floating Dock (`#fullshot-capture-dock`) implemented**:
     - Embedded directly in webpage DOM with high z-index (`2147483647`) so it never minimizes to taskbar or hides behind browser.
     - Zero in-page screenshot pollution: before each viewport capture, `prepare_for_snapshot` sets `display: none` and waits for double `requestAnimationFrame`s, ensuring Chromium's compositor paints a clean screen before `captureVisibleTabPng`.

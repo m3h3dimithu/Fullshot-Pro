@@ -25,18 +25,19 @@ Standard browser screenshot tools often fail on modern web pages because:
 ```
 [User on any Web Page]
        │
-       ├── Left-Click Icon ──────────► Immediate Full-Page Scroll & Capture
-       │                                     │
-       └── Right-Click Icon ─────────► [Capture Settings Panel (popup.html)]
-                                             │  - Change Layout Preset (SPA/Modal/Article)
-                                             │  - Adjust Settle Delay / Overlap
-                                             │  - Choose "Capture visible area"
-                                             ▼
-                                     [Progress Badge: 25%.. 50%.. 100%]
-                                             │
-                                             ▼
-                                 [Editor Opens Beside Active Tab]
-                                             │
+       ├── Left-Click Icon or Alt+Shift+S ──► [Fullshot Pro Capture Panel]
+       │                                            │  - Select Start Point: [Page top] | [Current position]
+       │                                            │  - Select Target Section or Pick on page
+       │                                            │  - Click "📸 Start" in header
+       │                                            ▼
+       │                                      [In-Page Non-Minimizing Dock: Live Progress]
+       │                                      [Instant Pause/Resume, Stop & View, Cancel]
+       │                                            ▼
+       └── Right-Click Context Menu ────────► Immediate Capture / Quick Access
+                                                    │
+                                                    ▼
+                                      [Editor Opens Beside Active Tab]
+                                                    │
              ┌───────────────────────────────┴───────────────────────────────┐
              ▼                               ▼                               ▼
     [Annotate / Markup]             [Crop / Blur / Censor]          [Instant Output]

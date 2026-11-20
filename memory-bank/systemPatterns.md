@@ -41,7 +41,7 @@ Fullshot Pro follows a modular Chrome Manifest V3 architecture with strict separ
 
 ### A. `manifest.json`
 - Declares MV3 compliance, service worker `background.js`, permissions, host permissions `<all_urls>`, and icon definitions.
-- Does **not** bind `default_popup` to action directly; instead, single left-click triggers immediate capture, while right-click context menu opens `popup.html` as a standalone settings modal.
+- Sets `"default_popup": "popup.html"` for 1-click panel access from the toolbar, registers `"commands"` (`Alt+Shift+S`) for global shortcut access, and provides page context menus.
 
 ### B. `capture-settings.js`
 - Shared settings definition module (imported via `importScripts` in `background.js` and included via `<script>` in `popup.html`).
