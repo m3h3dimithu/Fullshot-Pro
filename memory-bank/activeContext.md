@@ -4,9 +4,10 @@
 - **Status**: Production-ready, fully functional Chrome MV3 extension.
 - **Current Version**: `1.2.2`.
 - **Last Stoppage Point**:
-  - **Capture Start Position Selection implemented**:
-    - Added `startPosition: 'top' | 'current'` setting option in `capture-settings.js`, `popup.html`, and `popup.js`.
-    - User can choose to capture from the top of the page down to bottom (full page) or start exactly from their current scroll position down to bottom.
+  - **Capture Start Position Selection prominently placed at top of panel**:
+    - Added 1-click pill buttons (`⬆️ Page top` vs `⬇️ Current position`) directly at the top of the popup panel above the capture action buttons.
+    - Synchronized with `settings.startPosition`.
+    - Clicking `⬇️ Current position` dynamically updates the primary button label to `📸 Capture from here to bottom` for intuitive feedback.
     - Slices and canvas stitching calculate from `startY` dynamically.
   - **Capture In-Flight Floating Dock (`#fullshot-capture-dock`) implemented**:
     - Embedded directly in webpage DOM with high z-index (`2147483647`) so it never minimizes to taskbar or hides behind browser.
