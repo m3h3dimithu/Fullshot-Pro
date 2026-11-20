@@ -51,25 +51,16 @@ function renderSettings() {
   $('scrollTarget').value = settings.scrollTarget;
   $('selector').value = settings.selector;
   $('selectorField').hidden = settings.scrollTarget !== 'selector';
-  const currentMode = settings.captureType === 'visible'
-    ? 'visible'
-    : (settings.startPosition || 'top');
+  const startPos = settings.startPosition || 'top';
   if ($('startPosition')) {
-    $('startPosition').value = settings.startPosition || 'top';
+    $('startPosition').value = startPos;
   }
-  setChipActive('startPointChips', 'data-start', currentMode);
+  setChipActive('startPointChips', 'data-start', startPos);
   if ($('startCaptureBtn')) {
     const labelSpan = $('startCaptureBtn').querySelector('span:last-child');
     if (labelSpan) {
-      labelSpan.textContent = currentMode === 'visible'
-        ? 'Capture'
-        : 'Start';
+      labelSpan.textContent = 'Start';
     }
-  }
-  if ($('captureFull')) {
-    $('captureFull').textContent = currentMode === 'current'
-      ? '📸 Capture from here to bottom'
-      : '📸 Capture full page';
   }
   $('settleDelayMs').value = settings.settleDelayMs;
   $('startDelayMs').value = settings.startDelayMs;
@@ -203,14 +194,10 @@ function bindControls() {
   document.querySelectorAll('#startPointChips button').forEach((btn) => {
     btn.addEventListener('click', () => {
       const mode = btn.getAttribute('data-start') || 'top';
-      if (mode === 'visible') {
-        settings.captureType = 'visible';
-      } else {
-        settings.captureType = 'fullpage';
-        settings.startPosition = mode;
-        if ($('startPosition')) {
-          $('startPosition').value = mode;
-        }
+      settings.startPosition = mode;
+      settings.captureType = 'fullpage';
+      if ($('startPosition')) {
+        $('startPosition').value = mode;
       }
       setChipActive('startPointChips', 'data-start', mode);
       queueSave(false);
