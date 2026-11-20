@@ -457,6 +457,7 @@ function createOrGetCaptureDock() {
     font: 600 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     user-select: none !important;
     cursor: default !important;
+    pointer-events: auto !important;
     transition: box-shadow 0.2s ease, border-color 0.2s ease !important;
   `;
 
@@ -504,17 +505,23 @@ function createOrGetCaptureDock() {
   if (!window._fullshotDockKeyHandler) {
     window._fullshotDockKeyHandler = (e) => {
       const d = document.getElementById('fullshot-capture-dock');
-      if (!d || d.style.display === 'none') return;
+      if (!d) return;
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable)) return;
+
       if (e.code === 'Space') {
         e.preventDefault();
+        e.stopPropagation();
         const pBtn = d.querySelector('#fullshot-dock-btn-pause');
         if (pBtn) pBtn.click();
       } else if (e.code === 'Enter') {
         e.preventDefault();
+        e.stopPropagation();
         const sBtn = d.querySelector('#fullshot-dock-btn-stop');
         if (sBtn) sBtn.click();
       } else if (e.code === 'Escape') {
         e.preventDefault();
+        e.stopPropagation();
         const cBtn = d.querySelector('#fullshot-dock-btn-cancel');
         if (cBtn) cBtn.click();
       }
@@ -537,9 +544,9 @@ function updateCaptureDockUI(data) {
   const isMinimized = _captureDockState.isMinimized;
   const isStopping = _captureDockState.isStopping;
 
-  const currentSlice = data.currentSlice || 1;
-  const totalSlices = data.totalSlices || 1;
-  const pct = Math.max(0, Math.min(100, data.pct || 0));
+  const currentSlice = (data && data.currentSlice) || 1;
+  const totalSlices = (data && data.totalSlices) || 1;
+  const pct = Math.max(0, Math.min(100, (data && data.pct) || 0));
 
   let statusLabel = isStopping
     ? '⏹️ Stopping…'
@@ -547,11 +554,49 @@ function updateCaptureDockUI(data) {
       ? `⏸️ Paused (${pct}%)`
       : `📸 Slice ${currentSlice}/${totalSlices} (${pct}%)`;
 
+  const targetMode = isMinimized ? 'min' : 'full';
+
+  // In-place DOM update when mode hasn't changed to eliminate layout shifts, blinking and button remounting
+  if (dock.dataset.renderMode === targetMode) {
+    if (isMinimized) {
+      const minStatus = dock.querySelector('#fullshot-dock-min-status');
+      if (minStatus) {
+        minStatus.innerHTML = `${isPaused ? '⏸️' : '📸'} ${pct}%`;
+        minStatus.style.color = isPaused ? '#fbbf24' : '#a5b4fc';
+      }
+      const pauseBtn = dock.querySelector('#fullshot-dock-btn-pause');
+      if (pauseBtn) {
+        pauseBtn.innerHTML = isPaused ? '▶️' : '⏸️';
+        pauseBtn.style.background = isPaused ? '#4338ca' : '#1e1b4b';
+        pauseBtn.title = isPaused ? 'Resume capture [Space]' : 'Pause capture [Space]';
+      }
+    } else {
+      const statusSpan = dock.querySelector('#fullshot-dock-status-label');
+      if (statusSpan) {
+        statusSpan.textContent = statusLabel;
+        statusSpan.style.color = isPaused ? '#fbbf24' : '#e0e7ff';
+      }
+      const progressFill = dock.querySelector('#fullshot-dock-progress-fill');
+      if (progressFill) {
+        progressFill.style.width = `${pct}%`;
+      }
+      const pauseBtn = dock.querySelector('#fullshot-dock-btn-pause');
+      if (pauseBtn) {
+        pauseBtn.innerHTML = isPaused ? '▶️ Resume' : '⏸️ Pause';
+        pauseBtn.style.background = isPaused ? '#4338ca' : '#1e1b4b';
+        pauseBtn.title = isPaused ? 'Resume capture [Space]' : 'Pause capture [Space]';
+      }
+    }
+    return;
+  }
+
+  dock.dataset.renderMode = targetMode;
+
   if (isMinimized) {
     dock.style.borderRadius = '999px';
     dock.style.padding = '6px 12px';
     dock.innerHTML = `
-      <span style="color: ${isPaused ? '#fbbf24' : '#a5b4fc'}; font-size: 12px; font-weight: 700; cursor: move;">
+      <span id="fullshot-dock-min-status" style="color: ${isPaused ? '#fbbf24' : '#a5b4fc'}; font-size: 12px; font-weight: 700; cursor: move;">
         ${isPaused ? '⏸️' : '📸'} ${pct}%
       </span>
       <button id="fullshot-dock-btn-pause" type="button" style="background: ${isPaused ? '#4338ca' : '#1e1b4b'}; color: #c7d2fe; border: 1px solid #4f46e5; border-radius: 999px; padding: 3px 8px; font-size: 11px; font-weight: 600; cursor: pointer;" title="${isPaused ? 'Resume capture [Space]' : 'Pause capture [Space]'}">
@@ -569,14 +614,14 @@ function updateCaptureDockUI(data) {
     dock.style.padding = '8px 14px';
     dock.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px; cursor: move;">
-        <span style="color: ${isPaused ? '#fbbf24' : '#e0e7ff'}; font-size: 12px; font-weight: 700; white-space: nowrap;">
+        <span id="fullshot-dock-status-label" style="color: ${isPaused ? '#fbbf24' : '#e0e7ff'}; font-size: 12px; font-weight: 700; white-space: nowrap;">
           ${statusLabel}
         </span>
         <div style="width: 44px; height: 5px; background: #1e293b; border-radius: 999px; overflow: hidden; border: 1px solid #334155;">
-          <div style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #4f46e5, #818cf8); border-radius: 999px; transition: width 0.2s;"></div>
+          <div id="fullshot-dock-progress-fill" style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #4f46e5, #818cf8); border-radius: 999px; transition: width 0.15s ease;"></div>
         </div>
       </div>
-      <button id="fullshot-dock-btn-pause" type="button" style="background: ${isPaused ? '#4338ca' : '#1e1b4b'}; color: #c7d2fe; border: 1px solid #4f46e5; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;" title="Pause / Resume [Space]">
+      <button id="fullshot-dock-btn-pause" type="button" style="background: ${isPaused ? '#4338ca' : '#1e1b4b'}; color: #c7d2fe; border: 1px solid #4f46e5; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;" title="${isPaused ? 'Resume capture [Space]' : 'Pause capture [Space]'}">
         ${isPaused ? '▶️ Resume' : '⏸️ Pause'}
       </button>
       <button id="fullshot-dock-btn-stop" type="button" style="background: #059669; color: #ffffff; border: none; border-radius: 6px; padding: 5px 11px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;" title="Finish and view screenshot [Enter]">
@@ -640,7 +685,9 @@ function updateCaptureDockUI(data) {
 function prepareForSnapshot() {
   const dock = document.getElementById('fullshot-capture-dock');
   if (dock) {
-    dock.style.setProperty('display', 'none', 'important');
+    dock.style.setProperty('visibility', 'hidden', 'important');
+    dock.style.setProperty('opacity', '0', 'important');
+    dock.style.setProperty('pointer-events', 'none', 'important');
   }
   return new Promise((resolve) => {
     requestAnimationFrame(() => {
@@ -651,10 +698,25 @@ function prepareForSnapshot() {
   });
 }
 
+function restoreDock(data) {
+  const dock = document.getElementById('fullshot-capture-dock');
+  if (dock) {
+    dock.style.removeProperty('visibility');
+    dock.style.removeProperty('opacity');
+    dock.style.removeProperty('pointer-events');
+  }
+  if (data) {
+    updateCaptureDockUI(data);
+  }
+}
+
 function showCaptureDock(data) {
   const dock = createOrGetCaptureDock();
   if (dock) {
     dock.style.removeProperty('display');
+    dock.style.removeProperty('visibility');
+    dock.style.removeProperty('opacity');
+    dock.style.removeProperty('pointer-events');
   }
   updateCaptureDockUI(data);
 }
@@ -912,6 +974,18 @@ window.screenCaptureListener = (request, sender, sendResponse) => {
     prepareForSnapshot().then(() => {
       sendResponse({ ready: true });
     });
+    return true;
+  }
+
+  if (request.action === "restore_dock") {
+    restoreDock(request);
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === "update_capture_dock") {
+    updateCaptureDockUI(request);
+    sendResponse({ success: true });
     return true;
   }
 

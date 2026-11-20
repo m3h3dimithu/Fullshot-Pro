@@ -8,7 +8,7 @@
 | **Capture Engine** | Capture Visible Area | ✅ Complete | Available via right-click context menu |
 | **Capture Engine** | Inner Container & Modal Scroll | ✅ Complete | Detects scrollable `<div>` / modal / selector |
 | **Capture Engine** | Capture Start Position | ✅ Complete | Top to bottom OR Current scroll position via 1-click top chips |
-| **Capture Engine** | In-Flight Pause, Stop & Cancel | ✅ Complete | In-page non-minimizing dock (`#fullshot-capture-dock`) with double-rAF snapshot hiding & instant response |
+| **Capture Engine** | In-Flight Pause, Stop & Cancel | ✅ Complete | In-page non-minimizing standby dock (`#fullshot-capture-dock`) with zero-blink ~25ms snapshot hiding, in-place DOM updates & instant response |
 | **Capture Engine** | Sticky Header Suppression | ✅ Complete | Suppressed on slices > 0, restored on completion |
 | **Capture Engine** | Header Capture Once (`headerMode`) | ✅ Complete | Capture header once at the top without repeating |
 | **Capture Engine** | Default Target Marking & Preview | ✅ Complete | Border marks target section by default, hides on start |

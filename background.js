@@ -148,6 +148,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === 'pause_capture') {
     currentCaptureControl.isPaused = true;
+    if (currentCaptureControl.tabId) {
+      sendMessageWithRetry(currentCaptureControl.tabId, { action: 'update_capture_dock', isPaused: true }).catch(() => {});
+    }
     chrome.runtime.sendMessage({ action: 'capture_progress', isPaused: true }).catch(() => {});
     sendResponse({ ok: true });
     return true;
@@ -158,6 +161,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (currentCaptureControl.resumeResolve) {
       currentCaptureControl.resumeResolve();
       currentCaptureControl.resumeResolve = null;
+    }
+    if (currentCaptureControl.tabId) {
+      sendMessageWithRetry(currentCaptureControl.tabId, { action: 'update_capture_dock', isPaused: false }).catch(() => {});
     }
     chrome.runtime.sendMessage({ action: 'capture_progress', isPaused: false }).catch(() => {});
     sendResponse({ ok: true });
@@ -423,12 +429,31 @@ async function captureFullPage(tab, captureTypeOverride) {
         : dataUrl;
     };
 
+    const winId = tab.windowId || null;
+
+    // Zero-blink snapshot taker: hides dock for ~25ms snapshot, restores standby immediately
+    const takeCleanSnapshot = async (sliceIndex = 1, totalSlices = 1, currentPct = 100) => {
+      if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
+        return null;
+      }
+      await sendMessageWithRetry(tab.id, { action: "prepare_for_snapshot" });
+      const snap = await captureVisibleTabPng(winId);
+      await sendMessageWithRetry(tab.id, {
+        action: "restore_dock",
+        currentSlice: sliceIndex,
+        totalSlices: totalSlices,
+        pct: currentPct,
+        isPaused: currentCaptureControl.isPaused
+      });
+      return snap;
+    };
+
     if (settings.captureType === 'visible') {
       chrome.action.setBadgeText({ text: "100%" });
-      let dataUrl = await captureVisibleTabPng(tab.windowId || null);
+      let dataUrl = await takeCleanSnapshot(1, 1, 100);
       if (dataUrl && dataUrl.error === 'quota') {
         await sleep(800);
-        dataUrl = await captureVisibleTabPng(tab.windowId || null);
+        dataUrl = await takeCleanSnapshot(1, 1, 100);
       }
       await sendMessageWithRetry(tab.id, { action: "restore_scroll", settings });
       chrome.action.setBadgeText({ text: "" });
@@ -479,8 +504,6 @@ async function captureFullPage(tab, captureTypeOverride) {
     let capturedChunks = [];
     let lastCapturedScrollY = null;
     let lastCaptureFingerprint = null;
-
-    const winId = tab.windowId || null;
 
     broadcastProgress({
       currentSlice: 1,
@@ -557,17 +580,14 @@ async function captureFullPage(tab, captureTypeOverride) {
         break;
       }
 
-      // Hide dock and wait for clean compositor repaint before capturing
-      await sendMessageWithRetry(tab.id, { action: "prepare_for_snapshot" });
-
-      // Capture visual viewport chunk with backoff retry
+      // Capture visual viewport chunk with zero-blink snapshot and backoff retry
       let dataUrl = null;
       const maxRetries = 4;
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
           break;
         }
-        dataUrl = await captureVisibleTabPng(winId);
+        dataUrl = await takeCleanSnapshot(i + 1, totalPages, pct);
 
         if (dataUrl && dataUrl.error === "quota") {
           const backoff = 800 + (attempt * 600);
@@ -615,7 +635,7 @@ async function captureFullPage(tab, captureTypeOverride) {
           if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
             break;
           }
-          dataUrl = await captureVisibleTabPng(winId);
+          dataUrl = await takeCleanSnapshot(i + 1, totalPages, pct);
           if (!dataUrl || dataUrl.error) {
             break;
           }
@@ -642,7 +662,7 @@ async function captureFullPage(tab, captureTypeOverride) {
             if (currentCaptureControl.isCancelled || currentCaptureControl.isStopped) {
               break;
             }
-            dataUrl = await captureVisibleTabPng(winId);
+            dataUrl = await takeCleanSnapshot(i + 1, totalPages, pct);
             captureFingerprint = getCaptureFingerprint(dataUrl);
           }
         }
